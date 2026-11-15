@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findPlantedCredential, CANARY_LIBRARY } from '@/lib/canaries';
 import { detectAgentFamily } from '@/lib/agent-detector';
-import { getOrCreateSessionId } from '@/lib/session';
-import { recordHoneypotEvent } from '@/lib/supabase/server';
+import { recordHoneypotEvent, resolveSessionId } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
@@ -100,7 +99,7 @@ async function handleDecoyRequest(
     ? CANARY_LIBRARY.find((c) => c.id === matchedCred.canary_id)
     : undefined;
 
-  const sessionId = getOrCreateSessionId(headers, ip, userAgent);
+  const sessionId = await resolveSessionId(headers, ip, userAgent);
   const agentDetection = detectAgentFamily(userAgent, undefined, headers);
 
   // Record credential use event

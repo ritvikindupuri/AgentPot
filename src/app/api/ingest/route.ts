@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseAdmin, recordHoneypotEvent } from '@/lib/supabase/server';
-import { getOrCreateSessionId } from '@/lib/session';
+import { getSupabaseAdmin, recordHoneypotEvent, resolveSessionId } from '@/lib/supabase/server';
+import { isTestRequest, normalizeEventType } from '@/lib/session';
+import { EVENT_TYPES } from '@/lib/event-copy';
 import { checkRateLimit, checkPayloadSize } from '@/lib/rate-limiter';
 import { IngestPayload } from '@/lib/types';
 import { CANARY_LIBRARY, PLANTED_CREDENTIALS } from '@/lib/canaries';
@@ -118,8 +119,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const eventType = body.event_type || 'injection_fired';
-  const sessionId = getOrCreateSessionId(headers, ip, userAgent);
+  const eventType = body.event_type
+    ? normalizeEventType(body.event_type)
+    : 'injection_fired';
+  if (!eventType) {
+    return NextResponse.json(
+      {
+        error: `Invalid event_type. Allowed: ${EVENT_TYPES.join(', ')}`,
+      },
+      { status: 400 }
+    );
+  }
+
+  const isTest = isTestRequest(headers, {
+    ...(body as unknown as Record<string, unknown>),
+    ...((body.payload || {}) as Record<string, unknown>),
+  });
+  const sessionId = await resolveSessionId(headers, ip, userAgent, { isTest });
   const resolvedAgentName = body.agent_name || agentName || 'Friendly-Agent';
 
   let validCanaryId: string | null = null;
@@ -154,6 +170,7 @@ export async function POST(req: NextRequest) {
       agent_name: resolvedAgentName,
       details: body.details,
     },
+    isTest,
   });
 
   if (event.persisted === false) {

@@ -60,8 +60,57 @@ export function detectAgentFamily(
     };
   }
 
-  // 2. Custom AI Agent / Framework User-Agent matching
-  if (ua.includes('claude-code') || ua.includes('claudecode') || ua.includes('claude-web') || ua.includes('anthropic')) {
+  // 2. Known crawlers (checked before product names that share a vendor string)
+  if (ua.includes('claudebot') || ua.includes('claude-bot')) {
+    return {
+      family: 'Anthropic ClaudeBot (crawler)',
+      isLikelyAiAgent: true,
+      confidence: 'high',
+      details: 'User-Agent indicates Anthropic ClaudeBot web crawler',
+    };
+  }
+
+  const searchCrawlers: Array<{ test: (value: string) => boolean; family: string; ai: boolean; details: string }> = [
+    { test: (v) => v.includes('bingbot') || v.includes('bingpreview'), family: 'Microsoft Bingbot (crawler)', ai: false, details: 'User-Agent indicates Microsoft Bing crawler' },
+    { test: (v) => v.includes('googlebot') || v.includes('adsbot-google') || v.includes('mediapartners-google'), family: 'Googlebot (crawler)', ai: false, details: 'User-Agent indicates Google search crawler' },
+    { test: (v) => v.includes('applebot-extended'), family: 'Applebot Extended (crawler)', ai: true, details: 'User-Agent indicates Applebot-Extended AI crawler' },
+    { test: (v) => v.includes('applebot'), family: 'Applebot (crawler)', ai: false, details: 'User-Agent indicates Apple search crawler' },
+    { test: (v) => v.includes('duckduckbot') || v.includes('duckduckgo'), family: 'DuckDuckBot (crawler)', ai: false, details: 'User-Agent indicates DuckDuckGo crawler' },
+    { test: (v) => v.includes('yandexbot') || v.includes('yandex.com/bots'), family: 'YandexBot (crawler)', ai: false, details: 'User-Agent indicates Yandex crawler' },
+    { test: (v) => v.includes('baiduspider'), family: 'Baiduspider (crawler)', ai: false, details: 'User-Agent indicates Baidu crawler' },
+    { test: (v) => v.includes('slurp'), family: 'Yahoo Slurp (crawler)', ai: false, details: 'User-Agent indicates Yahoo crawler' },
+    { test: (v) => v.includes('ccbot'), family: 'Common Crawl CCBot (crawler)', ai: true, details: 'User-Agent indicates Common Crawl CCBot' },
+    { test: (v) => v.includes('facebookexternalhit') || v.includes('facebot'), family: 'Facebook (crawler)', ai: false, details: 'User-Agent indicates Facebook crawler' },
+    { test: (v) => v.includes('meta-externalagent') || v.includes('meta-externalfetcher'), family: 'Meta AI (crawler)', ai: true, details: 'User-Agent indicates Meta AI crawler' },
+    { test: (v) => v.includes('linkedinbot'), family: 'LinkedInBot (crawler)', ai: false, details: 'User-Agent indicates LinkedIn crawler' },
+    { test: (v) => v.includes('twitterbot') || v.includes('xbot'), family: 'Twitterbot (crawler)', ai: false, details: 'User-Agent indicates Twitter/X crawler' },
+    { test: (v) => v.includes('slackbot'), family: 'Slackbot (crawler)', ai: false, details: 'User-Agent indicates Slack unfurl crawler' },
+    { test: (v) => v.includes('ahrefsbot'), family: 'AhrefsBot (crawler)', ai: false, details: 'User-Agent indicates Ahrefs crawler' },
+    { test: (v) => v.includes('semrushbot'), family: 'SemrushBot (crawler)', ai: false, details: 'User-Agent indicates Semrush crawler' },
+    { test: (v) => v.includes('petalbot'), family: 'PetalBot (crawler)', ai: false, details: 'User-Agent indicates PetalBot crawler' },
+    { test: (v) => v.includes('dotbot'), family: 'DotBot (crawler)', ai: false, details: 'User-Agent indicates Moz DotBot crawler' },
+  ];
+  for (const crawler of searchCrawlers) {
+    if (crawler.test(ua)) {
+      return {
+        family: crawler.family,
+        isLikelyAiAgent: crawler.ai,
+        confidence: 'high',
+        details: crawler.details,
+      };
+    }
+  }
+
+  // 3. Custom AI Agent / Framework User-Agent matching
+  if (ua.includes('claude-code') || ua.includes('claudecode') || ua.includes('claude-web')) {
+    return {
+      family: 'Claude / Claude Code',
+      isLikelyAiAgent: true,
+      confidence: 'high',
+      details: 'User-Agent indicates Anthropic / Claude client',
+    };
+  }
+  if (ua.includes('anthropic') && !ua.includes('bot') && !ua.includes('crawler')) {
     return {
       family: 'Claude / Claude Code',
       isLikelyAiAgent: true,
@@ -151,7 +200,7 @@ export function detectAgentFamily(
     };
   }
 
-  // 3. Programmatic HTTP Libraries commonly used by autonomous LLM tool callers
+  // 4. Programmatic HTTP Libraries commonly used by autonomous LLM tool callers
   if (ua.includes('httpx') || ua.includes('python-requests') || ua.includes('aiohttp') || ua.includes('urllib')) {
     return {
       family: 'Python AI Tool Worker',

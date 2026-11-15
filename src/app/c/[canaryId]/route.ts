@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCanaryById } from '@/lib/canaries';
 import { detectAgentFamily } from '@/lib/agent-detector';
-import { getOrCreateSessionId } from '@/lib/session';
-import { recordHoneypotEvent } from '@/lib/supabase/server';
+import { recordHoneypotEvent, resolveSessionId } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
@@ -74,7 +73,7 @@ async function handleCanaryHit(
   }
 
   const canary = getCanaryById(canaryId);
-  const sessionId = getOrCreateSessionId(headers, ip, userAgent);
+  const sessionId = await resolveSessionId(headers, ip, userAgent);
   const agentDetection = detectAgentFamily(userAgent, undefined, headers);
 
   // Check if this appears to be exfiltration data

@@ -41,3 +41,24 @@ describe('Agent Family Detection & Heuristics', () => {
     expect(python.family).toBe('Python AI Tool Worker');
   });
 });
+
+  it('labels ClaudeBot as a crawler, not Claude Code', () => {
+    const bot = detectAgentFamily(
+      'Mozilla/5.0 (compatible; ClaudeBot/1.0; +https://www.anthropic.com/claudebot)'
+    );
+    expect(bot.family).toBe('Anthropic ClaudeBot (crawler)');
+    expect(bot.isLikelyAiAgent).toBe(true);
+
+    const code = detectAgentFamily('claude-code/1.0');
+    expect(code.family).toBe('Claude / Claude Code');
+  });
+
+  it('labels common search crawlers instead of Generic / Unknown Agent', () => {
+    const bing = detectAgentFamily(
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/116.0.1938.76 Safari/537.36'
+    );
+    expect(bing.family).toBe('Microsoft Bingbot (crawler)');
+
+    const google = detectAgentFamily('Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)');
+    expect(google.family).toBe('Googlebot (crawler)');
+  });

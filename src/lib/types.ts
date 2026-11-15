@@ -46,6 +46,7 @@ export interface Session {
   event_count: number;
   first_seen: string;
   last_seen: string;
+  is_test?: boolean;
 }
 
 export interface HoneypotEvent {
@@ -63,6 +64,7 @@ export interface HoneypotEvent {
   severity: EventSeverity;
   created_at: string;
   persisted?: boolean;
+  is_test?: boolean;
   session?: Session;
   canary?: Canary;
 }

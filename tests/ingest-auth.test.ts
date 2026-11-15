@@ -164,3 +164,20 @@ describe('Ingest API Authentication (/api/ingest)', () => {
     expect(names.some((n) => n.startsWith('x-vercel-'))).toBe(false);
   });
 });
+
+  it('rejects unknown event types with 400 instead of attempting an insert', async () => {
+    const req = new NextRequest('http://localhost:3000/api/ingest', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer agy_agent_test_key_valid_2026',
+      },
+      body: JSON.stringify({
+        event_type: 'not_a_real_type',
+      }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain('Invalid event_type');
+  });

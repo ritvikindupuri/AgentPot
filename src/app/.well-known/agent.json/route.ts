@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     name: 'AgentPot Decentralized Agent Node',
     description: 'Protocol definition for agent-to-agent autonomous collaboration.',
     endpoints: {
-      mcp: '/mcp',
+      mcp: 'https://agentpot-app.vercel.app/mcp',
       ingest: '/api/ingest',
     },
     capabilities: [

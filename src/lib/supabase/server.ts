@@ -1,8 +1,18 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { HoneypotEvent, Session, EventType, EventSeverity } from '../types';
-import { calculateEventSeverity, computeSessionSeverityScore } from '../session';
+import {
+  calculateEventSeverity,
+  fallbackSessionId,
+  getOrCreateSessionId,
+  isGenericFamily,
+  isTestRequest,
+  preferAgentFamily,
+  scoreEvents,
+  SESSION_RELINK_WINDOW_MS,
+  sessionIdFromHeaders,
+} from '../session';
 import { sanitizeHeaders } from '../headers';
-import { CANARY_LIBRARY } from '../canaries';
+import { CANARY_LIBRARY, PLANTED_CREDENTIALS } from '../canaries';
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -49,6 +59,7 @@ export interface RecordEventParams {
   payload?: Record<string, any>;
   clientInfo?: Record<string, any>;
   toolName?: string;
+  isTest?: boolean;
 }
 
 // Free-tier guard: cap stored raw headers/payload at a few KB (mirrored by a DB trigger).
@@ -68,205 +79,104 @@ export function capJson(
   return { _truncated: true, _original_bytes: bytes, preview: text.slice(0, maxBytes - 200) };
 }
 
-export async function recordHoneypotEvent(
-  params: RecordEventParams
-): Promise<HoneypotEvent> {
-  params = {
-    ...params,
-    headers: capJson(sanitizeHeaders(params.headers), 4096),
-    payload: capJson(params.payload, 8192),
-    clientInfo: capJson(params.clientInfo, 2048),
-    userAgent: params.userAgent ? params.userAgent.slice(0, 512) : params.userAgent,
-  };
-  const { severity, scorePoints } = calculateEventSeverity(params.eventType, {
-    toolName: params.toolName || (params.payload?.tool as string),
-    canaryId: params.canaryId || undefined,
-    isCredential: params.eventType === 'credential_use',
-    isExfil: params.eventType === 'exfil_attempt',
-  });
 
-  const now = new Date().toISOString();
-  const eventId = crypto.randomUUID();
+export function credentialUseLabel(event: {
+  canary_id?: string | null;
+  payload?: Record<string, any> | null;
+}): string {
+  const canaryId = event.canary_id || (event.payload?.canary_id as string) || '';
+  if (canaryId) {
+    const planted = PLANTED_CREDENTIALS.find(
+      (item) => item.canary_id === canaryId || item.key_id === canaryId
+    );
+    if (planted) return planted.key_name || planted.key_id;
+    const canary = CANARY_LIBRARY.find((item) => item.id === canaryId);
+    if (canary) return canary.name || canary.id;
+    return canaryId;
+  }
+  const payload = event.payload || {};
+  const fromPayload =
+    (payload.credential_name as string) ||
+    (payload.credentialName as string) ||
+    (payload.matched_credential as string) ||
+    (payload.credentialKey as string) ||
+    (payload.key_id as string) ||
+    (payload.key as string);
+  return fromPayload || 'unknown';
+}
+
+async function findRecentSessionIdByUserAgent(
+  userAgent: string,
+  isTest: boolean
+): Promise<string | null> {
+  const ua = (userAgent || '').slice(0, 512);
+  if (!ua) return null;
+  const since = new Date(Date.now() - SESSION_RELINK_WINDOW_MS).toISOString();
 
   const supabase = getSupabaseAdmin();
-
   if (supabase) {
     try {
-      // 1. Fetch or create session
-      const { data: existingSession } = await supabase
+      let query = supabase
         .from('sessions')
-        .select('*')
-        .eq('id', params.sessionId)
-        .single();
-
-      if (!existingSession) {
-        const { error: sessionInsertError } = await supabase.from('sessions').insert({
-          id: params.sessionId,
-          ip_address: params.ipAddress || null,
-          user_agent: params.userAgent || null,
-          agent_family: params.agentFamily,
-          client_info: params.clientInfo || {},
-          severity_score: scorePoints,
-          event_count: 1,
-          first_seen: now,
-          last_seen: now,
-        });
-
-        if (sessionInsertError) {
-          console.error('sessions insert failed', sessionInsertError.code, sessionInsertError.message);
-          return {
-            id: eventId,
-            session_id: params.sessionId,
-            event_type: params.eventType,
-            canary_id: params.canaryId || null,
-            agent_family: params.agentFamily,
-            source_endpoint: params.sourceEndpoint,
-            request_method: params.requestMethod,
-            ip_address: params.ipAddress || null,
-            user_agent: params.userAgent || null,
-            headers: params.headers || {},
-            payload: params.payload || {},
-            severity,
-            created_at: now,
-            persisted: false,
-          };
-        }
-      } else {
-        const newScore = computeSessionSeverityScore(
-          existingSession.severity_score || 0,
-          scorePoints
-        );
-        const { error: sessionUpdateError } = await supabase
-          .from('sessions')
-          .update({
-            severity_score: newScore,
-            event_count: (existingSession.event_count || 1) + 1,
-            last_seen: now,
-            agent_family:
-              existingSession.agent_family === 'Unknown' ||
-              existingSession.agent_family === 'Generic / Unknown Agent'
-                ? params.agentFamily
-                : existingSession.agent_family,
-          })
-          .eq('id', params.sessionId);
-
-        if (sessionUpdateError) {
-          console.error('sessions update failed', sessionUpdateError.code, sessionUpdateError.message);
-          return {
-            id: eventId,
-            session_id: params.sessionId,
-            event_type: params.eventType,
-            canary_id: params.canaryId || null,
-            agent_family: params.agentFamily,
-            source_endpoint: params.sourceEndpoint,
-            request_method: params.requestMethod,
-            ip_address: params.ipAddress || null,
-            user_agent: params.userAgent || null,
-            headers: params.headers || {},
-            payload: params.payload || {},
-            severity,
-            created_at: now,
-            persisted: false,
-          };
-        }
+        .select('id, last_seen')
+        .eq('user_agent', ua)
+        .gte('last_seen', since)
+        .order('last_seen', { ascending: false })
+        .limit(1);
+      query = isTest ? query.eq('is_test', true) : query.or('is_test.eq.false,is_test.is.null');
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        return data[0].id as string;
       }
-
-      // 2. Insert event
-      const { data: newEvent, error } = await supabase
-        .from('events')
-        .insert({
-          id: eventId,
-          session_id: params.sessionId,
-          event_type: params.eventType,
-          canary_id: params.canaryId || null,
-          agent_family: params.agentFamily,
-          source_endpoint: params.sourceEndpoint,
-          request_method: params.requestMethod,
-          ip_address: params.ipAddress || null,
-          user_agent: params.userAgent || null,
-          headers: params.headers || {},
-          payload: params.payload || {},
-          severity,
-          created_at: now,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('events insert failed', error.code, error.message);
-        return {
-          id: eventId,
-          session_id: params.sessionId,
-          event_type: params.eventType,
-          canary_id: params.canaryId || null,
-          agent_family: params.agentFamily,
-          source_endpoint: params.sourceEndpoint,
-          request_method: params.requestMethod,
-          ip_address: params.ipAddress || null,
-          user_agent: params.userAgent || null,
-          headers: params.headers || {},
-          payload: params.payload || {},
-          severity,
-          created_at: now,
-          persisted: false,
-        };
-      }
-
-      if (newEvent) {
-        return { ...(newEvent as HoneypotEvent), persisted: true };
-      }
-    } catch (err: any) {
-      console.error('events insert failed', err?.code || 'EXCEPTION', err?.message || String(err));
-      return {
-        id: eventId,
-        session_id: params.sessionId,
-        event_type: params.eventType,
-        canary_id: params.canaryId || null,
-        agent_family: params.agentFamily,
-        source_endpoint: params.sourceEndpoint,
-        request_method: params.requestMethod,
-        ip_address: params.ipAddress || null,
-        user_agent: params.userAgent || null,
-        headers: params.headers || {},
-        payload: params.payload || {},
-        severity,
-        created_at: now,
-        persisted: false,
-      };
+    } catch (err) {
+      console.error('session relink lookup failed', err);
     }
   }
 
-  // Runtime in-memory store (real requests only)
-  let session = runtimeSessions.get(params.sessionId);
-  if (!session) {
-    session = {
-      id: params.sessionId,
-      ip_address: params.ipAddress || null,
-      user_agent: params.userAgent || null,
-      agent_family: params.agentFamily,
-      client_info: params.clientInfo || {},
-      severity_score: scorePoints,
-      event_count: 1,
-      first_seen: now,
-      last_seen: now,
-    };
-    runtimeSessions.set(params.sessionId, session);
-  } else {
-    session.event_count += 1;
-    session.severity_score = computeSessionSeverityScore(
-      session.severity_score,
-      scorePoints
-    );
-    session.last_seen = now;
-    if (
-      session.agent_family === 'Unknown' ||
-      session.agent_family === 'Generic / Unknown Agent'
-    ) {
-      session.agent_family = params.agentFamily;
+  let best: Session | null = null;
+  const sinceMs = Date.now() - SESSION_RELINK_WINDOW_MS;
+  for (const session of runtimeSessions.values()) {
+    if ((session.user_agent || '') !== ua) continue;
+    const sessionIsTest = Boolean((session as Session & { is_test?: boolean }).is_test);
+    if (sessionIsTest !== isTest) continue;
+    const last = new Date(session.last_seen).getTime();
+    if (Number.isNaN(last) || last < sinceMs) continue;
+    if (!best || new Date(session.last_seen).getTime() > new Date(best.last_seen).getTime()) {
+      best = session;
     }
   }
+  return best?.id || null;
+}
 
-  const memoryEvent: HoneypotEvent = {
+export async function resolveSessionId(
+  headers: Record<string, string>,
+  ip: string,
+  userAgent: string,
+  options?: { isTest?: boolean }
+): Promise<string> {
+  const isTest = options?.isTest ?? isTestRequest(headers);
+  const hinted = getOrCreateSessionId(headers, ip, userAgent, { isTest });
+  if (sessionIdFromHeaders(headers)) return hinted;
+  const found = await findRecentSessionIdByUserAgent(userAgent, isTest);
+  if (found) return found;
+  return fallbackSessionId(userAgent, { isTest });
+}
+
+function toolNameFrom(params: RecordEventParams): string | undefined {
+  return (
+    params.toolName ||
+    (typeof params.payload?.tool === 'string' ? params.payload.tool : undefined) ||
+    (typeof params.payload?.toolName === 'string' ? params.payload.toolName : undefined)
+  );
+}
+
+function unfinishedEvent(
+  eventId: string,
+  params: RecordEventParams,
+  severity: EventSeverity,
+  now: string
+): HoneypotEvent {
+  return {
     id: eventId,
     session_id: params.sessionId,
     event_type: params.eventType,
@@ -280,13 +190,228 @@ export async function recordHoneypotEvent(
     payload: params.payload || {},
     severity,
     created_at: now,
+    persisted: false,
+  };
+}
+
+export async function recordHoneypotEvent(
+  params: RecordEventParams
+): Promise<HoneypotEvent> {
+  const isTest =
+    params.isTest ??
+    isTestRequest(params.headers, params.payload as Record<string, unknown> | undefined);
+
+  params = {
+    ...params,
+    headers: capJson(sanitizeHeaders(params.headers), 4096),
+    payload: capJson(params.payload, 8192),
+    clientInfo: capJson(params.clientInfo, 2048),
+    userAgent: params.userAgent ? params.userAgent.slice(0, 512) : params.userAgent,
+    isTest,
+  };
+
+  const now = new Date().toISOString();
+  const eventId = crypto.randomUUID();
+  const supabase = getSupabaseAdmin();
+
+  let existingSession: (Session & { is_test?: boolean }) | null = null;
+  let priorEvents: HoneypotEvent[] = [];
+
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('id', params.sessionId)
+        .maybeSingle();
+      existingSession = (data as Session) || null;
+    } catch (err) {
+      console.error('session lookup failed', err);
+    }
+  } else {
+    existingSession = runtimeSessions.get(params.sessionId) || null;
+  }
+
+  if (supabase && existingSession) {
+    try {
+      const { data } = await supabase
+        .from('events')
+        .select('event_type, payload, agent_family')
+        .eq('session_id', params.sessionId)
+        .order('created_at', { ascending: true });
+      priorEvents = (data as HoneypotEvent[]) || [];
+    } catch (err) {
+      console.error('prior events lookup failed', err);
+    }
+  } else if (!supabase) {
+    priorEvents = runtimeEvents
+      .filter((event) => event.session_id === params.sessionId)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }
+
+  const sessionHasInjection = priorEvents.some((event) => event.event_type === 'injection_fired');
+  const resolvedFamily = preferAgentFamily(existingSession?.agent_family, params.agentFamily);
+  params = { ...params, agentFamily: resolvedFamily };
+
+  const { severity } = calculateEventSeverity(params.eventType, {
+    toolName: toolNameFrom(params),
+    canaryId: params.canaryId || undefined,
+    isCredential: params.eventType === 'credential_use',
+    isExfil: params.eventType === 'exfil_attempt',
+    sessionHasInjection,
+  });
+
+  const eventRow = {
+    id: eventId,
+    session_id: params.sessionId,
+    event_type: params.eventType,
+    canary_id: params.canaryId || null,
+    agent_family: resolvedFamily,
+    source_endpoint: params.sourceEndpoint,
+    request_method: params.requestMethod,
+    ip_address: params.ipAddress || null,
+    user_agent: params.userAgent || null,
+    headers: params.headers || {},
+    payload: params.payload || {},
+    severity,
+    created_at: now,
+    is_test: isTest,
+  };
+
+  const persistSessionCounts = async (allEvents: HoneypotEvent[]) => {
+    const eventCount = allEvents.length;
+    const severityScore = scoreEvents(allEvents);
+    let family = resolvedFamily;
+    for (const event of allEvents) {
+      family = preferAgentFamily(family, event.agent_family);
+    }
+    return { eventCount, severityScore, family };
+  };
+
+  if (supabase) {
+    try {
+      if (!existingSession) {
+        const { error: sessionInsertError } = await supabase.from('sessions').insert({
+          id: params.sessionId,
+          ip_address: params.ipAddress || null,
+          user_agent: params.userAgent || null,
+          agent_family: resolvedFamily,
+          client_info: params.clientInfo || {},
+          severity_score: 0,
+          event_count: 0,
+          first_seen: now,
+          last_seen: now,
+          is_test: isTest,
+        });
+
+        if (sessionInsertError) {
+          // Concurrent insert: load the winner and continue. Any other error is fatal.
+          const { data: raced } = await supabase
+            .from('sessions')
+            .select('*')
+            .eq('id', params.sessionId)
+            .maybeSingle();
+          if (!raced) {
+            console.error('sessions insert failed', sessionInsertError.code, sessionInsertError.message);
+            return unfinishedEvent(eventId, params, severity, now);
+          }
+          existingSession = raced as Session;
+        }
+      }
+
+      const { data: newEvent, error } = await supabase
+        .from('events')
+        .insert(eventRow)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('events insert failed', error.code, error.message, 'event_type=', params.eventType);
+        return unfinishedEvent(eventId, params, severity, now);
+      }
+
+      const { data: allRows } = await supabase
+        .from('events')
+        .select('event_type, payload, agent_family')
+        .eq('session_id', params.sessionId)
+        .order('created_at', { ascending: true });
+      const allEvents = (allRows as HoneypotEvent[]) || [...priorEvents, { ...(newEvent as HoneypotEvent) }];
+      const { eventCount, severityScore, family } = await persistSessionCounts(allEvents);
+
+      const { error: sessionUpdateError } = await supabase
+        .from('sessions')
+        .update({
+          severity_score: severityScore,
+          event_count: eventCount,
+          last_seen: now,
+          agent_family: family,
+        })
+        .eq('id', params.sessionId);
+
+      if (sessionUpdateError) {
+        console.error('sessions update failed', sessionUpdateError.code, sessionUpdateError.message);
+      }
+
+      if (family !== resolvedFamily || priorEvents.some((event) => event.agent_family !== family)) {
+        const { error: backfillError } = await supabase
+          .from('events')
+          .update({ agent_family: family })
+          .eq('session_id', params.sessionId)
+          .neq('agent_family', family);
+        if (backfillError) {
+          console.error('event family backfill failed', backfillError.code, backfillError.message);
+        }
+      }
+
+      return { ...(newEvent as HoneypotEvent), agent_family: family, persisted: true };
+    } catch (err: any) {
+      console.error('events insert failed', err?.code || 'EXCEPTION', err?.message || String(err));
+      return unfinishedEvent(eventId, params, severity, now);
+    }
+  }
+
+  // Runtime in-memory store (real requests only, plus flagged test events)
+  let session = runtimeSessions.get(params.sessionId);
+  if (!session) {
+    session = {
+      id: params.sessionId,
+      ip_address: params.ipAddress || null,
+      user_agent: params.userAgent || null,
+      agent_family: resolvedFamily,
+      client_info: params.clientInfo || {},
+      severity_score: 0,
+      event_count: 0,
+      first_seen: now,
+      last_seen: now,
+      is_test: isTest,
+    };
+    runtimeSessions.set(params.sessionId, session);
+  }
+
+  const memoryEvent: HoneypotEvent = {
+    ...eventRow,
     persisted: true,
   };
 
   runtimeEvents.unshift(memoryEvent);
   if (runtimeEvents.length > 500) runtimeEvents.pop();
 
-  return memoryEvent;
+  const allEvents = runtimeEvents
+    .filter((event) => event.session_id === params.sessionId)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const { eventCount, severityScore, family } = await persistSessionCounts(allEvents);
+  session.event_count = eventCount;
+  session.severity_score = severityScore;
+  session.last_seen = now;
+  session.agent_family = family;
+  if (isGenericFamily(session.agent_family) && !isGenericFamily(resolvedFamily)) {
+    session.agent_family = resolvedFamily;
+  }
+  for (const event of allEvents) {
+    event.agent_family = session.agent_family;
+  }
+
+  return { ...memoryEvent, agent_family: session.agent_family };
 }
 
 export async function getRecentEvents(limit = 100): Promise<HoneypotEvent[]> {
@@ -296,6 +421,7 @@ export async function getRecentEvents(limit = 100): Promise<HoneypotEvent[]> {
       const { data, error } = await supabase
         .from('events')
         .select('*')
+        .or('is_test.eq.false,is_test.is.null')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -306,7 +432,7 @@ export async function getRecentEvents(limit = 100): Promise<HoneypotEvent[]> {
       console.error('Error fetching recent events from Supabase:', e);
     }
   }
-  return runtimeEvents.slice(0, limit);
+  return runtimeEvents.filter((event) => !event.is_test).slice(0, limit);
 }
 
 export async function getSessions(limit = 50): Promise<Session[]> {
@@ -316,6 +442,7 @@ export async function getSessions(limit = 50): Promise<Session[]> {
       const { data, error } = await supabase
         .from('sessions')
         .select('*')
+        .or('is_test.eq.false,is_test.is.null')
         .order('last_seen', { ascending: false })
         .limit(limit);
 
@@ -327,6 +454,7 @@ export async function getSessions(limit = 50): Promise<Session[]> {
     }
   }
   return Array.from(runtimeSessions.values())
+    .filter((session) => !session.is_test)
     .sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime())
     .slice(0, limit);
 }
@@ -412,7 +540,7 @@ export async function getTelemetryStats() {
     }
 
     if (event.event_type === 'credential_use') {
-      const cred = (event.payload?.credentialKey as string) || (event.payload?.key as string) || 'unknown';
+      const cred = credentialUseLabel(event);
       credentialUses[cred] = (credentialUses[cred] || 0) + 1;
     }
 
