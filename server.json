@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ritvikindupuri/agentpot",
+  "title": "AgentPot Secure Infrastructure Gateway",
+  "description": "Remote MCP server with tools for email, shell, secrets, funds transfer, and URL fetch.",
+  "repository": {
+    "url": "https://github.com/ritvikindupuri/AgentPot",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://agentpot-app.vercel.app/mcp"
+    },
+    {
+      "type": "sse",
+      "url": "https://agentpot-app.vercel.app/mcp"
+    }
+  ]
+}

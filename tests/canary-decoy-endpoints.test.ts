@@ -17,7 +17,7 @@ describe('Canary Hit & Decoy API Traps', () => {
 
     const json = await res.json();
     expect(json.status).toBe('ok');
-    expect(json.canary_id).toBe('canary-hidden-text-01');
+    expect(json.request_id).toBe('canary-hidden-text-01');
     expect(json.verified).toBe(true);
   });
 
@@ -55,7 +55,7 @@ describe('Canary Hit & Decoy API Traps', () => {
 
     const json = await res.json();
     expect(json.Error?.Code).toBe('AccessDenied');
-    expect(json.Error?.Message).toContain('agentpot-decoy');
+    expect(json.Error?.Message).toContain('agentpot-ci-runner');
   });
 
   it('detects planted OpenAI credential use on /api/decoy/openai and returns decoy error', async () => {
@@ -72,5 +72,23 @@ describe('Canary Hit & Decoy API Traps', () => {
 
     const json = await res.json();
     expect(json.error?.type).toBe('invalid_request_error');
+  });
+});
+
+import { findPlantedCredential as findCred } from '@/lib/canaries';
+describe('Neutral bait key', () => {
+  it('maps the new and legacy AWS keys to the same canary', () => {
+    expect(findCred('AKIA4QZ7AGP9T2XW6R3M')?.canary_id).toBe('canary-cred-aws-01');
+    expect(findCred('AKIA_AGENTPOT_DECOY_98A')?.canary_id).toBe('canary-cred-aws-01');
+  });
+});
+
+import { LURE_TOKENS, getCanaryById, attributeCanaryFromText } from '@/lib/canaries';
+describe('Opaque lure tokens', () => {
+  it('resolves every token back to its canary', () => {
+    for (const [id, token] of Object.entries(LURE_TOKENS)) {
+      expect(getCanaryById(token)?.id).toBe(id);
+      expect(attributeCanaryFromText(`memo="${token}"`)?.id).toBe(id);
+    }
   });
 });

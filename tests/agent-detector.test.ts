@@ -40,7 +40,6 @@ describe('Agent Family Detection & Heuristics', () => {
     const python = detectAgentFamily('python-requests/2.31.0');
     expect(python.family).toBe('Python AI Tool Worker');
   });
-});
 
   it('labels ClaudeBot as a crawler, not Claude Code', () => {
     const bot = detectAgentFamily(
@@ -62,3 +61,73 @@ describe('Agent Family Detection & Heuristics', () => {
     const google = detectAgentFamily('Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)');
     expect(google.family).toBe('Googlebot (crawler)');
   });
+
+  it('labels well-known AI fetcher User-Agents as their own families', () => {
+    const cases: Array<[string, string]> = [
+      [
+        'Mozilla/5.0 (compatible; ExaUser/1.0; +https://exauser.crawler.exa.ai)',
+        'ExaUser (Exa)',
+      ],
+      [
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot',
+        'ChatGPT-User (fetcher)',
+      ],
+      [
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot',
+        'OAI-SearchBot (crawler)',
+      ],
+      [
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +Claude-User@anthropic.com)',
+        'Claude-User (fetcher)',
+      ],
+      [
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-SearchBot/1.0; +https://www.anthropic.com/claudesearchbot)',
+        'Claude-SearchBot (crawler)',
+      ],
+      [
+        'Mozilla/5.0 (compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)',
+        'Perplexity-User (fetcher)',
+      ],
+      [
+        'Mozilla/5.0 (compatible; Google-Extended/1.0; +https://developers.google.com/search/docs/crawling-indexing/google-extended)',
+        'Google-Extended (fetcher)',
+      ],
+      [
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Safari/605.1.15 (Applebot-Extended/0.1; +http://www.apple.com/go/applebot)',
+        'Applebot-Extended (fetcher)',
+      ],
+      ['Mozilla/5.0 (compatible; cohere-ai/1.0)', 'Cohere (cohere-ai)'],
+      [
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; YouBot/1.0; +https://docs.you.com/youbot; env:prod) Chrome/120.0.0.0 Safari/537.36',
+        'YouBot (fetcher)',
+      ],
+      ['Mozilla/5.0 (compatible; Diffbot/1.0; +https://www.diffbot.com)', 'Diffbot (fetcher)'],
+      ['FirecrawlAgent/1.0', 'Firecrawl (fetcher)'],
+      ['Mozilla/5.0 (compatible; Jina/1.0; +https://jina.ai/reader)', 'Jina Reader (fetcher)'],
+      ['TavilyBot/1.0', 'Tavily (fetcher)'],
+      [
+        'Mozilla/5.0 (Linux; Android 5.0) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36 (compatible; Bytespider; https://zhanzhang.toutiao.com/)',
+        'Bytespider (crawler)',
+      ],
+    ];
+
+    for (const [ua, family] of cases) {
+      const result = detectAgentFamily(ua);
+      expect(result.family, ua).toBe(family);
+      expect(result.isLikelyAiAgent, ua).toBe(true);
+    }
+
+    // These must not be swallowed by a sibling or generic vendor label.
+    expect(
+      detectAgentFamily('Mozilla/5.0 (compatible; Claude-User/1.0; +Claude-User@anthropic.com)').family
+    ).not.toBe('Claude / Claude Code');
+    expect(
+      detectAgentFamily(
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot'
+      ).family
+    ).not.toBe('OpenAI / GPTBot');
+    expect(detectAgentFamily('Mozilla/5.0 (compatible; Bytespider)').family).not.toBe(
+      'AI Crawler / Scraper'
+    );
+  });
+});

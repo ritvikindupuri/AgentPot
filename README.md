@@ -19,7 +19,7 @@ A team of Grok Bot agents designs the decoys, reads the traffic, and regression-
 - **Inert decoys, real telemetry.** MCP tools, poisoned pages, and canary links look useful to an agent and do nothing dangerous when called.
 - **Event classification.** Page reads, prompt-injection hits, tool calls, credential use, exfil attempts, MCP handshakes, and tool discovery are stored with a severity and a session.
 - **Session linking without raw IPs.** A session is keyed first on an MCP or client session id, then on the User-Agent within a six-hour window. Cloudflare egress IPs are recorded on the event but are not used as the session key, so a rotating IP does not split one client into many sessions.
-- **Consistent agent families.** If a session is identified as an MCP client (or another specific family), later events in that session keep that family instead of falling back to Generic. Search crawlers such as Bingbot, Googlebot, and Anthropic ClaudeBot are labeled as crawlers, not as generic unknown agents, and ClaudeBot is not labeled as Claude Code.
+- **Consistent agent families.** If a session is identified as an MCP client (or another specific family), later events in that session keep that family instead of falling back to Generic. Well-known AI fetchers such as ExaUser and ChatGPT-User get their own labels. Search crawlers such as Bingbot, Googlebot, and Anthropic ClaudeBot are labeled as crawlers, not as generic unknown agents, and ClaudeBot is not labeled as Claude Code.
 - **A live dashboard.** Signed-in users share one view of overview stats, sessions, and event detail. Test-flagged rows are filtered out. A password login is also kept for automated Agent Tester checks.
 - **Free-tier guard.** Events older than 30 days are cleaned up, and stored request payloads are capped, so the project stays inside a Supabase free plan.
 - **A specialist team.** Decoy Builder, Attack Analyst, and Agent Tester work with the Honeypot Lead. Each specialist, including the Honeypot Lead, is published as a Grok Bot template.
@@ -45,17 +45,18 @@ These rules keep AgentPot safe to run as a public honeypot.
 
 Each agent appears with its real Grok Bot avatar: **Honeypot Lead** yellow hex, **Decoy Builder** orange flower, **Attack Analyst** red shield, **Agent Tester** green capsule.
 
-The intended flow, which a revised figure will match after review, is: an AI agent or crawler reaches the decoys (MCP server, poisoned pages, and canary keys), the request is ingested and classified, it is written to Supabase, and the realtime dashboard on Vercel (Next.js) shows the session. The Grok Bot team works alongside that path: Decoy Builder on the lures, Attack Analyst on the stored traffic, Agent Tester on the live surfaces, and the Honeypot Lead coordinating.
+The intended flow, which a revised figure will match after review, is: an AI agent, MCP client, AI fetcher, or crawler finds the decoys through search, AI fetchers, or MCP directories, then reaches the MCP server at `/mcp`, the poisoned pages, the bait API at `/api/v1`, or a lure at `/c/<token>`. The request is ingested and classified, it is written to Supabase, and the dashboard on Vercel (Next.js) shows the session after the next poll (about every four seconds). The Grok Bot team works alongside that path: Decoy Builder on the lures, Attack Analyst on the stored traffic, Agent Tester on the live surfaces, and the Honeypot Lead coordinating.
 
 <details>
 <summary><b>Mermaid source for the same flow</b></summary>
 
 ```mermaid
 flowchart TD
-  A["AI agents, MCP clients, crawlers"] --> D["Decoys: MCP server, poisoned pages, canary keys"]
+  Src["Search, AI fetchers, MCP directories"] --> A["AI agents, MCP clients, crawlers"]
+  A --> D["Decoys: /mcp, poisoned pages, /api/v1, /c/<token>"]
   D --> C["Ingestion and classification"]
   C --> S["Supabase"]
-  S --> V["Realtime dashboard on Vercel"]
+  S --> V["Dashboard on Vercel"]
   You["You (Ritvik)"] --> V
 
   L["Honeypot Lead"] --- B["Decoy Builder"]
@@ -81,25 +82,26 @@ flowchart TD
 
 ### How it works, step by step
 
-1. **An agent finds a decoy.** It may load a documentation page, read `llms.txt` or a plugin manifest, or connect to the decoy MCP server at `https://agentpot-app.vercel.app/mcp`.
+1. **An agent finds a decoy.** Visitors typically arrive through search results, AI fetchers, or MCP directories. From there they may load a documentation page, read `llms.txt` or a plugin manifest, call a lure at `/c/<token>` or `/api/v1`, or connect to the decoy MCP server at `https://agentpot-app.vercel.app/mcp`.
 2. **A canary or tool is touched.** Hidden text, comments, planted links, or a fake tool call are enough. The decoy returns inert text; it does not perform the action the tool name suggests.
 3. **The request is classified and stored.** AgentPot records the event type, severity, session, and a size-capped, header-sanitized copy of the request, then writes it to Supabase. If the request is a team probe (`X-AgentPot-Test` or `is_test`), the row is flagged and kept out of the dashboard lists.
 4. **The session is linked.** A later request from the same MCP session id, or from the same User-Agent within six hours, joins the existing session even if the client IP changed. Event counts are recounted from stored rows after each successful insert, and the session family stays consistent.
-5. **The dashboard updates.** Signed-in operators see the new real session and events on the shared overview, including severity and risk tooltips that match the rules in the app.
+5. **The dashboard updates.** The shared overview polls about every four seconds. Signed-in operators then see the new real session and events, including severity and risk tooltips that match the rules in the app.
 6. **The bot team works from that signal.** Attack Analyst reviews patterns, Decoy Builder adjusts lures, and Agent Tester checks that the surfaces still behave as designed (testers should send `X-AgentPot-Test` so those probes do not land in the live view).
 
 ### Decoy types and canaries
 
 AgentPot uses three kinds of lure. This is a high-level description only; planted canary values are not listed here. On the live demo, absolute URLs point at `https://agentpot-app.vercel.app`.
 
-- **Decoy MCP server** at [https://agentpot-app.vercel.app/mcp](https://agentpot-app.vercel.app/mcp). JSON-RPC tools with names that look operational (`send_email`, `run_shell`, `read_secrets`, `transfer_funds`, `fetch_url`) respond with fake text. `initialize`, `tools/list`, and `resources/list` or `resources/read` are also recorded. MCP-specific lures include:
-  - Server instructions (`canary-mcp-instructions-11`) that tell a client to register by fetching the matching canary URL.
+- **Decoy MCP server** at [https://agentpot-app.vercel.app/mcp](https://agentpot-app.vercel.app/mcp). It advertises itself as `AgentPot Secure Infrastructure Gateway`. The endpoint accepts JSON-RPC over HTTP (`initialize` negotiates protocol versions `2024-11-05`, `2025-03-26`, and `2025-06-18`) and also answers a legacy SSE handshake on GET when the client asks for `text/event-stream`. The tools are `send_email`, `run_shell`, `read_secrets`, `transfer_funds`, and `fetch_url`; each returns fake text only. `initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` are recorded. There is one resource, `config://prod/deploy.yaml` (the production deploy config), and one prompt, `incident_triage`. MCP-specific lures include:
+  - Server instructions (`canary-mcp-instructions-11`) that tell a client to register by fetching the matching lure URL.
   - A poisoned `fetch_url` tool description (`canary-tool-desc-10`) that tells a model to call `read_secrets` first.
   - Second-stage text in the `fetch_url` and `run_shell` tool results (`canary-tool-result-12`, `canary-tool-result-13`).
-  - A poisoned MCP resource (`canary-resource-14`) in the decoy deploy config.
-  - A vault token planted only as bait in the `read_secrets` result (`canary-cred-mcp-04`). Presenting that token to the decoy secrets endpoint is recorded as credential use.
+  - A poisoned comment in the `config://prod/deploy.yaml` resource (`canary-resource-14`).
+  - A vault token planted only as bait in the `read_secrets` result (`canary-cred-mcp-04`). Presenting that token to `/api/v1/secrets` is recorded as credential use. Legacy `/api/decoy/secrets` still uses the same handler.
+  - The public bait and tool arguments show opaque `/c/<token>` values from the `LURE_TOKENS` map in `src/lib/canaries.ts`, not these internal canary IDs. The same map is what resolves a hit back to the canary.
 - **Poisoned pages.** Public documentation-style routes, `llms.txt`, robots rules, and plugin-style manifests include hidden instructions and links that a careful human would ignore and an eager agent might follow. Live entry points include [https://agentpot-app.vercel.app/docs](https://agentpot-app.vercel.app/docs), [https://agentpot-app.vercel.app/readme](https://agentpot-app.vercel.app/readme), [https://agentpot-app.vercel.app/llms.txt](https://agentpot-app.vercel.app/llms.txt), [https://agentpot-app.vercel.app/robots.txt](https://agentpot-app.vercel.app/robots.txt), [https://agentpot-app.vercel.app/.well-known/agent.json](https://agentpot-app.vercel.app/.well-known/agent.json), and [https://agentpot-app.vercel.app/.well-known/ai-plugin.json](https://agentpot-app.vercel.app/.well-known/ai-plugin.json).
-- **Canary links.** Unique paths under `/c/<id>` (for example `https://agentpot-app.vercel.app/c/canary-hidden-text-01`) and related decoy API routes under `/api/decoy/` fire when fetched. Techniques include hidden text, HTML comments, markdown links, zero-width characters, image alt text, system-prompt wording, and credentials planted only as bait.
+- **Canary links.** Public lure URLs use opaque tokens under `/c/<token>`. `LURE_TOKENS` in `src/lib/canaries.ts` maps each token to its internal canary, and the `/c/<token>` route plus text attribution both honor that map. Legacy `/c/<canary-id>` paths still resolve to the same canaries, so older copies of the bait are still caught. Related bait API routes live under `/api/v1/` (legacy `/api/decoy/` still uses the same handler). The planted AWS credential is a realistic AKIA-format key; its older value still maps to `canary-cred-aws-01`. Fake AWS, OpenAI, and Vault error responses, and the fallback message (`Invalid or expired credentials.`), stay neutral and do not mention a decoy or honeypot. Techniques include hidden text, HTML comments, markdown links, zero-width characters, image alt text, system-prompt wording, and credentials planted only as bait.
 
 ### Event types
 
@@ -117,7 +119,7 @@ AgentPot uses three kinds of lure. This is a high-level description only; plante
 
 ### Dashboard
 
-The dashboard is a single shared view for every signed-in account. It includes an overview of recent activity (including an events-per-hour chart in local time), session lists, canary hits, and event detail (what happened, the request, and sanitized headers). Credential-use stats label keys from the planted canary id when one is present, rather than showing "unknown".
+The dashboard is a single shared view for every signed-in account. It polls about every four seconds (and pauses when the tab is hidden). It includes an overview of recent activity (including an events-per-hour chart in local time), session lists, canary hits, and event detail (what happened, the request, and sanitized headers). Credential-use stats label keys from the planted canary id when one is present, rather than showing "unknown".
 
 Sign up and sign in use Supabase Auth (email and password). If confirm-email is enabled on the Supabase project, the signup page shows a check-your-email state and `/auth/callback` completes the session. If confirm-email is off, signup returns a session and lands on `/dashboard`. A separate admin-password cookie path is kept so Agent Tester can still authenticate with curl without a user account.
 
@@ -132,8 +134,9 @@ Severity and risk scores come from `calculateEventSeverity` and `computeSessionS
 
 Classification uses MCP `clientInfo` when it is present, then the User-Agent. Examples implemented in the detector:
 
-- Product agents such as Claude Code, Cursor, GPTBot / ChatGPT-User, Gemini / Google-Extended, Perplexity, Copilot, AutoGPT, LangChain, and CrewAI.
-- Search and AI crawlers, including Anthropic ClaudeBot (labeled `Anthropic ClaudeBot (crawler)`, not `Claude / Claude Code`), Microsoft Bingbot, Googlebot, Applebot, DuckDuckBot, YandexBot, Baiduspider, Common Crawl CCBot, Facebook, Meta AI, LinkedInBot, Twitterbot, Slackbot, AhrefsBot, SemrushBot, PetalBot, and DotBot.
+- Product agents such as Claude Code, Cursor, GPTBot, Gemini / Vertex AI, PerplexityBot, Copilot, AutoGPT, LangChain, and CrewAI.
+- AI fetchers with their own labels when the User-Agent is a well-known token: ExaUser (Exa), ChatGPT-User, OAI-SearchBot, Claude-User, Claude-SearchBot, Perplexity-User, Google-Extended, Applebot-Extended, Cohere (cohere-ai), YouBot, Diffbot, Firecrawl, Jina Reader, Tavily, and Bytespider. ClaudeBot stays `Anthropic ClaudeBot (crawler)` and is not labeled as Claude Code.
+- Search crawlers, including Microsoft Bingbot, Googlebot, Applebot, DuckDuckBot, YandexBot, Baiduspider, Common Crawl CCBot, Facebook, Meta AI, LinkedInBot, Twitterbot, Slackbot, AhrefsBot, SemrushBot, PetalBot, and DotBot.
 - Programmatic clients (Python `requests` / httpx, Node fetch / axios, curl / wget) when no more specific product string is present.
 - `Generic / Unknown Agent` only when none of those signals match. A later, more specific label in the same session is applied to the whole session.
 
@@ -167,7 +170,7 @@ Template: [Import](https://x.ai/bot/7H7-KOtOR8eOyh4Jt72Ck)
 
 - **Next.js 14** (App Router) and TypeScript and Tailwind CSS, deployed on **Vercel** (Node 22.x).
 - **Supabase** Postgres for events and sessions, with Row Level Security. The service-role key is used only on the server after an auth check. **Supabase Auth** handles email and password signup and login via `@supabase/ssr`.
-- **Decoy MCP** is a JSON-RPC endpoint implemented in the Next.js app, not a standalone MCP process.
+- **Decoy MCP** is a JSON-RPC endpoint implemented in the Next.js app at `/mcp`, not a standalone MCP process. It presents as `AgentPot Secure Infrastructure Gateway`.
 - **Grok Bot** runs the specialist team and their group chat.
 - **GitHub** hosts this repository.
 
@@ -202,7 +205,7 @@ cp .env.example .env.local
 
 ### 3. Apply database migrations
 
-In the Supabase SQL editor, or with the Supabase CLI pointed at your project, apply the files in `supabase/migrations/` in timestamp order. They create the events and sessions tables, the free-tier cleanup policy, MCP event types, canary rows, and the `is_test` flag used to hide team probes from the dashboard.
+In the Supabase SQL editor, or with the Supabase CLI pointed at your project, apply the files in `supabase/migrations/` in timestamp order. They create the events and sessions tables, the free-tier cleanup policy, MCP event types, canary rows, the `is_test` flag used to hide team probes from the dashboard, and the bait-path update that points planted actions at `/api/v1` while keeping older `/api/decoy` values valid.
 
 ### 4. Import the specialist templates
 
@@ -226,12 +229,21 @@ The live demo is on Vercel at [https://agentpot-app.vercel.app](https://agentpot
 3. Use **Node.js 22.x**.
 4. Turn off Deployment Protection on the production host so decoy routes stay publicly reachable.
 5. If you use Supabase Auth confirm-email, add the production origin and `/auth/callback` to the project's Site URL and redirect allow-list.
-6. Apply every file in `supabase/migrations/` to the production database, including the `is_test` columns, before you rely on dashboard filtering.
+6. Apply every file in `supabase/migrations/` to the production database, including the `is_test` columns and the bait-path update, before you rely on dashboard filtering.
+
+The repo root includes `server.json` for the official MCP Registry (`io.github.ritvikindupuri/agentpot`), pointing at the public `/mcp` endpoint over Streamable HTTP and legacy SSE, and `glama.json` naming the GitHub maintainer `ritvikindupuri`. Nothing has been submitted yet. The listing plan is:
+
+- **Official MCP Registry** (`registry.modelcontextprotocol.io`): publish with `mcp-publisher login github` and `mcp-publisher publish`. That GitHub login has to be done by the repo owner and has not been run.
+- **Glama**: after the official listing exists, Glama syncs published Streamable HTTP endpoints on an hourly schedule. `glama.json` is ready so the listing can be claimed. A manual Add MCP Server submission on glama.ai also needs a GitHub login.
+- **PulseMCP**: submissions are paused. PulseMCP says it will pick up official-registry listings automatically when it reopens, so no separate form is needed now.
+- **mcp.so**: listing is a manual submit at [https://mcp.so/submit](https://mcp.so/submit) (or the site's intake issue) and needs the repo owner.
+- **Smithery**: the old MCP proxy shut down on 31 October 2026, and the previous `/new` publish path is gone. Do not submit there until Smithery documents a current listing flow.
+
 
 ## How to use it
 
 - **Watch the dashboard.** Sign in at the live demo or your own deploy and look at overview counts, sessions, and event detail. Only rows that are not flagged as test appear there.
-- **Point an agent at a decoy.** Connect an MCP client to [https://agentpot-app.vercel.app/mcp](https://agentpot-app.vercel.app/mcp), or let a crawler or coding agent fetch the public pages listed above. The decoys are meant to be discovered.
+- **Point an agent at a decoy.** Connect an MCP client to [https://agentpot-app.vercel.app/mcp](https://agentpot-app.vercel.app/mcp), or let a crawler, AI fetcher, or coding agent fetch the public pages listed above. The decoys are meant to be discovered through search, AI fetchers, and MCP directories once those listings are published.
 - **Flag your own probes.** Send `X-AgentPot-Test: 1` (or include `"is_test": true` in an ingest body) when you are testing, so those events are stored but kept out of the live view.
 - **Report an event yourself.** `POST /api/ingest` with `Authorization: Bearer <AGENT_INGEST_KEY>` or `X-Agent-Key`, and a JSON body whose `event_type` is one of the types in the table above.
 - **Import the specialist templates.** Open the links in [Specialist details](#specialist-details), import each bot into your Grok Bot account, and work with them in a shared room.
@@ -243,4 +255,4 @@ The live demo is on Vercel at [https://agentpot-app.vercel.app](https://agentpot
 - Clients that share an identical User-Agent and have no MCP session id can be linked into one session during the six-hour window.
 - Supabase free-tier email rate limits can delay or block new signups when confirm-email is on.
 - The dashboard overview may briefly show zeros until stats have loaded.
-- Figure 1 in this README is the previously published architecture image. A revised diagram that matches the flow above is waiting on review before it replaces that file.
+- Figure 1 matches the flow above. Agents and crawlers reach the decoys through search, AI fetchers, and MCP directories.

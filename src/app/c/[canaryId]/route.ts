@@ -98,7 +98,8 @@ async function handleCanaryHit(
     userAgent,
     headers,
     payload: {
-      canary_id: canaryId,
+      canary_id: canary?.id || canaryId,
+      lure_token: canaryId,
       canary_technique: canary?.technique || 'unknown',
       canary_name: canary?.name || 'Unregistered Canary',
       planted_location: canary?.location || 'unknown',
@@ -111,7 +112,7 @@ async function handleCanaryHit(
   return NextResponse.json({
     status: 'ok',
     beacon: 'received',
-    canary_id: canaryId,
+    request_id: canaryId,
     verified: true,
     timestamp: new Date().toISOString(),
   });

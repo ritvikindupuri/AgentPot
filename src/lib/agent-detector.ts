@@ -60,20 +60,41 @@ export function detectAgentFamily(
     };
   }
 
-  // 2. Known crawlers (checked before product names that share a vendor string)
-  if (ua.includes('claudebot') || ua.includes('claude-bot')) {
-    return {
-      family: 'Anthropic ClaudeBot (crawler)',
-      isLikelyAiAgent: true,
-      confidence: 'high',
-      details: 'User-Agent indicates Anthropic ClaudeBot web crawler',
-    };
+  // 2. AI fetchers and known crawlers (specific tokens before generic vendor names)
+  const token = (value: string, needle: string) => value.includes(needle);
+
+  const aiFetchers: Array<{ test: (value: string) => boolean; family: string; details: string }> = [
+    { test: (v) => token(v, 'exauser'), family: 'ExaUser (Exa)', details: 'User-Agent indicates Exa on-demand fetcher (ExaUser)' },
+    { test: (v) => token(v, 'chatgpt-user'), family: 'ChatGPT-User (fetcher)', details: 'User-Agent indicates OpenAI ChatGPT-User fetcher' },
+    { test: (v) => token(v, 'oai-searchbot'), family: 'OAI-SearchBot (crawler)', details: 'User-Agent indicates OpenAI OAI-SearchBot' },
+    { test: (v) => token(v, 'claude-user'), family: 'Claude-User (fetcher)', details: 'User-Agent indicates Anthropic Claude-User fetcher' },
+    { test: (v) => token(v, 'claude-searchbot'), family: 'Claude-SearchBot (crawler)', details: 'User-Agent indicates Anthropic Claude-SearchBot' },
+    { test: (v) => token(v, 'claudebot') || token(v, 'claude-bot'), family: 'Anthropic ClaudeBot (crawler)', details: 'User-Agent indicates Anthropic ClaudeBot web crawler' },
+    { test: (v) => token(v, 'perplexity-user'), family: 'Perplexity-User (fetcher)', details: 'User-Agent indicates Perplexity-User fetcher' },
+    { test: (v) => token(v, 'google-extended'), family: 'Google-Extended (fetcher)', details: 'User-Agent indicates Google-Extended AI fetcher' },
+    { test: (v) => token(v, 'applebot-extended'), family: 'Applebot-Extended (fetcher)', details: 'User-Agent indicates Applebot-Extended AI fetcher' },
+    { test: (v) => token(v, 'cohere-ai') || token(v, 'coherebot') || /(?:^|[^a-z])cohere(?:[^a-z]|$)/.test(v), family: 'Cohere (cohere-ai)', details: 'User-Agent indicates Cohere AI fetcher' },
+    { test: (v) => token(v, 'youbot'), family: 'YouBot (fetcher)', details: 'User-Agent indicates You.com YouBot' },
+    { test: (v) => token(v, 'diffbot'), family: 'Diffbot (fetcher)', details: 'User-Agent indicates Diffbot fetcher' },
+    { test: (v) => token(v, 'firecrawlagent') || token(v, 'firecrawl'), family: 'Firecrawl (fetcher)', details: 'User-Agent indicates Firecrawl fetcher' },
+    { test: (v) => token(v, 'jina.ai') || token(v, 'jina-reader') || token(v, 'jinareader') || token(v, 'jinaai') || token(v, 'jina reader'), family: 'Jina Reader (fetcher)', details: 'User-Agent indicates Jina AI reader fetcher' },
+    { test: (v) => token(v, 'tavilybot') || token(v, 'tavily-ai') || token(v, 'tavily/') || /(?:^|[^a-z])tavily(?:[^a-z]|$)/.test(v), family: 'Tavily (fetcher)', details: 'User-Agent indicates Tavily fetcher' },
+    { test: (v) => token(v, 'bytespider'), family: 'Bytespider (crawler)', details: 'User-Agent indicates ByteDance Bytespider crawler' },
+  ];
+  for (const fetcher of aiFetchers) {
+    if (fetcher.test(ua)) {
+      return {
+        family: fetcher.family,
+        isLikelyAiAgent: true,
+        confidence: 'high',
+        details: fetcher.details,
+      };
+    }
   }
 
   const searchCrawlers: Array<{ test: (value: string) => boolean; family: string; ai: boolean; details: string }> = [
     { test: (v) => v.includes('bingbot') || v.includes('bingpreview'), family: 'Microsoft Bingbot (crawler)', ai: false, details: 'User-Agent indicates Microsoft Bing crawler' },
     { test: (v) => v.includes('googlebot') || v.includes('adsbot-google') || v.includes('mediapartners-google'), family: 'Googlebot (crawler)', ai: false, details: 'User-Agent indicates Google search crawler' },
-    { test: (v) => v.includes('applebot-extended'), family: 'Applebot Extended (crawler)', ai: true, details: 'User-Agent indicates Applebot-Extended AI crawler' },
     { test: (v) => v.includes('applebot'), family: 'Applebot (crawler)', ai: false, details: 'User-Agent indicates Apple search crawler' },
     { test: (v) => v.includes('duckduckbot') || v.includes('duckduckgo'), family: 'DuckDuckBot (crawler)', ai: false, details: 'User-Agent indicates DuckDuckGo crawler' },
     { test: (v) => v.includes('yandexbot') || v.includes('yandex.com/bots'), family: 'YandexBot (crawler)', ai: false, details: 'User-Agent indicates Yandex crawler' },
@@ -128,7 +149,7 @@ export function detectAgentFamily(
     };
   }
 
-  if (ua.includes('gptbot') || ua.includes('chatgpt-user') || ua.includes('openai')) {
+  if (ua.includes('gptbot') || ua.includes('openai')) {
     return {
       family: 'OpenAI / GPTBot',
       isLikelyAiAgent: true,
@@ -164,16 +185,16 @@ export function detectAgentFamily(
     };
   }
 
-  if (ua.includes('google-extended') || ua.includes('gemini') || ua.includes('vertexai')) {
+  if (ua.includes('gemini') || ua.includes('vertexai')) {
     return {
       family: 'Gemini / Google AI',
       isLikelyAiAgent: true,
       confidence: 'high',
-      details: 'User-Agent matches Google Gemini / Google-Extended',
+      details: 'User-Agent matches Google Gemini / Vertex AI',
     };
   }
 
-  if (ua.includes('perplexity') || ua.includes('perplexitybot')) {
+  if (ua.includes('perplexitybot') || ua.includes('perplexity')) {
     return {
       family: 'Perplexity AI',
       isLikelyAiAgent: true,
@@ -191,7 +212,7 @@ export function detectAgentFamily(
     };
   }
 
-  if (ua.includes('bytespider') || ua.includes('cohere') || ua.includes('amazonbot')) {
+  if (ua.includes('amazonbot')) {
     return {
       family: 'AI Crawler / Scraper',
       isLikelyAiAgent: true,
