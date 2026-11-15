@@ -26,23 +26,23 @@ function getHeadersObject(req: NextRequest): Record<string, string> {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { ref: string } }
+  { params }: { params: { deploymentId: string } }
 ) {
-  return handleCanaryHit(req, params.ref, 'GET');
+  return handleCanaryHit(req, params.deploymentId, 'GET');
 }
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { ref: string } }
+  { params }: { params: { deploymentId: string } }
 ) {
-  return handleCanaryHit(req, params.ref, 'POST');
+  return handleCanaryHit(req, params.deploymentId, 'POST');
 }
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { ref: string } }
+  { params }: { params: { deploymentId: string } }
 ) {
-  return handleCanaryHit(req, params.ref, 'PUT');
+  return handleCanaryHit(req, params.deploymentId, 'PUT');
 }
 
 async function handleCanaryHit(

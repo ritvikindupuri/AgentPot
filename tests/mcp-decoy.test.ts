@@ -168,6 +168,7 @@ describe('MCP auth gate', () => {
     const json = await (await mcpPost(req)).json();
     expect(json.result.isError).toBe(true);
     expect(json.result.content[0].text).toContain('Unauthorized');
+    expect(json.result.content[0].text.toLowerCase()).not.toContain('sandbox');
   });
 });
 

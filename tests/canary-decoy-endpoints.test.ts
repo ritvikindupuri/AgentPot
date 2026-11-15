@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET as getCanary, POST as postCanary } from '@/app/c/[ref]/route';
+import { GET as getCanary, POST as postCanary } from '@/app/c/[deploymentId]/route';
 import { POST as postDecoyApi } from '@/app/api/decoy/[...slug]/route';
 
 describe('Canary Hit & Decoy API Traps', () => {
@@ -12,7 +12,7 @@ describe('Canary Hit & Decoy API Traps', () => {
       },
     });
 
-    const res = await getCanary(req, { params: { ref: 'canary-hidden-text-01' } });
+    const res = await getCanary(req, { params: { deploymentId: 'canary-hidden-text-01' } });
     expect(res.status).toBe(200);
 
     const json = await res.json();
@@ -24,7 +24,7 @@ describe('Canary Hit & Decoy API Traps', () => {
 
   it('returns believable health JSON on /status/<token>', async () => {
     const req = new NextRequest('http://localhost:3000/status/0fabf5cda418');
-    const res = await getCanary(req, { params: { ref: '0fabf5cda418' } });
+    const res = await getCanary(req, { params: { deploymentId: '0fabf5cda418' } });
     const json = await res.json();
     expect(json.status).toBe('healthy');
     expect(json.replicas.ready).toBe(6);
@@ -44,7 +44,7 @@ describe('Canary Hit & Decoy API Traps', () => {
       }),
     });
 
-    const res = await postCanary(req, { params: { ref: 'canary-zero-width-04' } });
+    const res = await postCanary(req, { params: { deploymentId: 'canary-zero-width-04' } });
     expect(res.status).toBe(200);
 
     const json = await res.json();
@@ -116,7 +116,7 @@ describe('lure classification', () => {
         'x-agentpot-test': 'classifier-status',
       },
     });
-    const res = await getCanary(req, { params: { ref: '0fabf5cda418' } });
+    const res = await getCanary(req, { params: { deploymentId: '0fabf5cda418' } });
     expect(res.status).toBe(200);
     const events = await getSessionEventSummaries(`sess_test_${sessionKey}`);
     const types = events.map((event) => event.event_type);
@@ -140,7 +140,7 @@ describe('lure classification', () => {
       ['/c/02138453bf2a', '02138453bf2a'],
     ] as const) {
       const req = new NextRequest(`http://localhost:3000${path}`, { headers });
-      const res = await getCanary(req, { params: { ref: id } });
+      const res = await getCanary(req, { params: { deploymentId: id } });
       expect(res.status).toBe(200);
     }
 
