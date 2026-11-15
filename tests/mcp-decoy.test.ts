@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/mcp/route';
 import { getRecentEvents } from '@/lib/supabase/server';
+import { PLANTED_CREDENTIALS } from '@/lib/canaries';
 
 describe('Decoy MCP Server (/mcp)', () => {
   it('handles MCP initialize handshake returning compliant capabilities', async () => {
@@ -171,5 +172,85 @@ describe('MCP auth gate', () => {
     const json = await (await mcpPost(req)).json();
     expect(json.result.isError).toBe(true);
     expect(json.result.content[0].text).toContain('Unauthorized');
+  });
+});
+
+describe('MCP planted-key logging', () => {
+  const workspaceKey = PLANTED_CREDENTIALS.find((c) => c.canary_id === 'canary-cred-mcp-05')!.key_id;
+  const otherKey = PLANTED_CREDENTIALS.find((c) => c.canary_id === 'canary-cred-openai-02')!.key_id;
+
+  async function call(method: string, params: Record<string, unknown>, headers: Record<string, string> = {}, ua: string) {
+    const req = new NextRequest('http://localhost:3000/mcp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'user-agent': ua,
+        ...headers,
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 21, method, params }),
+    });
+    return POST(req);
+  }
+
+  function usesFor(ua: string, events: Awaited<ReturnType<typeof getRecentEvents>>) {
+    return events.filter((e) => {
+      const type = (e as any).eventType || e.event_type;
+      return type === 'credential_use' && e.user_agent === ua;
+    });
+  }
+
+  it('logs credential_use on initialize, tools/list, resources/read, and prompts/get when the workspace key is presented', async () => {
+    const methods = ['initialize', 'tools/list', 'resources/read', 'prompts/get'] as const;
+    for (const method of methods) {
+      const ua = `AgentPot-McpCred-Test/${method}`;
+      const params =
+        method === 'initialize'
+          ? { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'cred-test', version: '1' } }
+          : method === 'resources/read'
+            ? { uri: 'config://prod/deploy.yaml' }
+            : method === 'prompts/get'
+              ? { name: 'incident_triage' }
+              : {};
+      const res = await call(method, params, { authorization: `Bearer ${workspaceKey}` }, ua);
+      expect(res.status).toBe(200);
+      const uses = usesFor(ua, await getRecentEvents(80));
+      expect(uses).toHaveLength(1);
+      expect(uses[0].canary_id || (uses[0] as any).canaryId).toBe('canary-cred-mcp-05');
+      expect(uses[0].payload?.method).toBe(method);
+    }
+  });
+
+  it('logs credential_use once on tools/call when a planted key is presented', async () => {
+    const ua = 'AgentPot-McpCred-Test/tools-call';
+    const res = await call(
+      'tools/call',
+      { name: 'run_shell', arguments: { command: 'id' } },
+      { authorization: `Bearer ${workspaceKey}` },
+      ua,
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.result?.isError).not.toBe(true);
+    const uses = usesFor(ua, await getRecentEvents(80));
+    expect(uses).toHaveLength(1);
+    expect(uses[0].payload?.method).toBe('tools/call');
+    expect(uses[0].canary_id || (uses[0] as any).canaryId).toBe('canary-cred-mcp-05');
+  });
+
+  it('logs credential_use when a non-workspace planted key appears on tools/list', async () => {
+    const ua = 'AgentPot-McpCred-Test/other-key';
+    const res = await call('tools/list', {}, { 'x-api-key': otherKey }, ua);
+    expect(res.status).toBe(200);
+    const uses = usesFor(ua, await getRecentEvents(80));
+    expect(uses).toHaveLength(1);
+    expect(uses[0].payload?.method).toBe('tools/list');
+    expect(uses[0].canary_id || (uses[0] as any).canaryId).toBe('canary-cred-openai-02');
+  });
+
+  it('does not log credential_use when no planted key is presented', async () => {
+    const ua = 'AgentPot-McpCred-Test/no-key';
+    const res = await call('initialize', { protocolVersion: '2025-03-26', capabilities: {} }, {}, ua);
+    expect(res.status).toBe(200);
+    expect(usesFor(ua, await getRecentEvents(80))).toHaveLength(0);
   });
 });
