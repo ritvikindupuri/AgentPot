@@ -22,7 +22,7 @@ A team of Grok Bot agents designs the decoys, reads the traffic, and regression-
 - **Event classification.** Crawls, prompt-injection hits, tool calls, credential use, exfil attempts, MCP handshakes, and tool discovery are stored with a severity and a session.
 - **A live dashboard.** Signed-in users share one view of overview stats, sessions, and event detail. A password login is also kept for automated Agent Tester checks.
 - **Free-tier guard.** Events older than 30 days are cleaned up, and stored request payloads are capped, so the project stays inside a Supabase free plan.
-- **A specialist team.** Decoy Builder, Attack Analyst, and Agent Tester work with the Honeypot Lead. Each specialist is published as a Grok Bot template (the Lead template is still forthcoming).
+- **A specialist team.** Decoy Builder, Attack Analyst, and Agent Tester work with the Honeypot Lead. Each specialist, including the Honeypot Lead, is published as a Grok Bot template.
 
 ## Safeguards
 
@@ -127,9 +127,9 @@ Sign up and sign in use Supabase Auth (email and password). Confirm-email may st
 
 ### Honeypot Lead
 
-Coordinates the team, keeps decoys inert, and decides what gets changed. Template link coming soon.
+Coordinates the team, keeps decoys inert, and decides what gets changed.
 
-<!-- TODO: add the Honeypot Lead Grok Bot template link here when it is published. -->
+Template: [Import](https://x.ai/bot/rpnvitFIbtXcp-0sW8M-m)
 
 ### Decoy Builder
 
@@ -222,7 +222,7 @@ The live demo is on Vercel at [https://agentpot-app.vercel.app](https://agentpot
 
 - **Watch the dashboard.** Sign in at the live demo or your own deploy and look at overview counts, sessions, and event detail.
 - **Point an agent at a decoy.** Connect an MCP client to `/mcp`, or let a crawler or coding agent fetch the public pages. The decoys are meant to be discovered.
-- **Import the specialist templates.** Open the links in [Specialist details](#specialist-details), import each bot into your Grok Bot account, and work with them in a shared room. The Honeypot Lead template is not published yet.
+- **Import the specialist templates.** Open the links in [Specialist details](#specialist-details), import each bot into your Grok Bot account, and work with them in a shared room.
 
 ## Limitations
 
@@ -230,4 +230,3 @@ The live demo is on Vercel at [https://agentpot-app.vercel.app](https://agentpot
 - Severity scores are assigned by rules in the app, not by a human incident responder. Treat them as a starting point.
 - Supabase free-tier email rate limits can delay or block new signups when confirm-email is on.
 - The dashboard overview may briefly show zeros until stats have loaded.
-- The Honeypot Lead Grok Bot template is not published yet (see the TODO in [Specialist details](#specialist-details)).
