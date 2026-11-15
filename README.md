@@ -6,9 +6,9 @@ The live demo is at [https://agentpot-app.vercel.app](https://agentpot-app.verce
 
 ## Project description
 
-AI agents browse docs, call tools, and follow instructions they find in pages and plugin manifests. That is useful, and it is also a new attack surface: a prompt hidden in a comment, a tool that looks like it can run a shell, a credential left in a markdown file. Seeing what an agent actually does in those situations is hard if you only have production systems to watch.
+AI agents browse docs, call tools, and follow instructions they find in pages and plugin manifests. That is useful, and it is also a new attack surface: a setup step in a comment, a tool that looks like it can run a shell, a sandbox key left in a docs page. Seeing what an agent actually does in those situations is hard if you only have production systems to watch.
 
-AgentPot is a honeypot built for that problem. It publishes inert decoys (a decoy MCP server, poisoned documentation pages, and canary tokens) and records every touch. Events are classified, written to Supabase, and shown on a shared dashboard. Nothing in the decoys executes a real command, talks to a real mailbox or bank, or makes an outbound request on the caller's behalf.
+AgentPot is a honeypot built for that problem. It publishes inert decoys (a decoy MCP server, documentation-style pages, and canary tokens) and records every touch. Events are classified, written to Supabase, and shown on a shared dashboard. Nothing in the decoys executes a real command, talks to a real mailbox or bank, or makes an outbound request on the caller's behalf.
 
 The dashboard follows a real-agents-only policy. Requests that carry an `X-AgentPot-Test` header, or a body or payload with `is_test` set to true, are still stored, but they are marked `is_test` and excluded from the overview, session list, and event list. Use that header for team probes so the live view stays focused on real agents and crawlers.
 
@@ -16,7 +16,7 @@ A team of Grok Bot agents designs the decoys, reads the traffic, and regression-
 
 ## Key features
 
-- **Inert decoys, real telemetry.** MCP tools, poisoned pages, and canary links look useful to an agent and do nothing dangerous when called.
+- **Inert decoys, real telemetry.** MCP tools, documentation-style pages, and canary links look useful to an agent and do nothing dangerous when called.
 - **Event classification.** Page reads, prompt-injection hits, tool calls, credential use, exfil attempts, MCP handshakes, and tool discovery are stored with a severity and a session.
 - **Session linking without raw IPs.** A session is keyed first on an MCP or client session id, then on the User-Agent within a six-hour window. Cloudflare egress IPs are recorded on the event but are not used as the session key, so a rotating IP does not split one client into many sessions.
 - **Consistent agent families.** If a session is identified as an MCP client (or another specific family), later events in that session keep that family instead of falling back to Generic. Well-known AI fetchers such as ExaUser and ChatGPT-User get their own labels. Search crawlers such as Bingbot, Googlebot, and Anthropic ClaudeBot are labeled as crawlers, not as generic unknown agents, and ClaudeBot is not labeled as Claude Code.
@@ -45,7 +45,7 @@ These rules keep AgentPot safe to run as a public honeypot.
 
 Each agent appears with its real Grok Bot avatar: **Honeypot Lead** yellow hex, **Decoy Builder** orange flower, **Attack Analyst** red shield, **Agent Tester** green capsule.
 
-The intended flow, which a revised figure will match after review, is: an AI agent, MCP client, AI fetcher, or crawler finds the decoys through search, AI fetchers, or MCP directories, then reaches the MCP server at `/mcp`, the poisoned pages, the bait API at `/api/v1`, or a lure at `/c/<token>`. The request is ingested and classified, it is written to Supabase, and the dashboard on Vercel (Next.js) shows the session after the next poll (about every four seconds). The Grok Bot team works alongside that path: Decoy Builder on the lures, Attack Analyst on the stored traffic, Agent Tester on the live surfaces, and the Honeypot Lead coordinating.
+The flow is: an AI agent, MCP client, AI fetcher, or crawler finds the decoys through search, AI fetchers, or MCP directories, then reaches the MCP server at `/mcp`, the documentation-style pages, the bait API at `/api/v1`, or a lure at `/c/<token>`. The request is ingested and classified, it is written to Supabase, and the dashboard on Vercel (Next.js) shows the session after the next poll (about every four seconds). The Grok Bot team works alongside that path: Decoy Builder on the lures, Attack Analyst on the stored traffic, Agent Tester on the live surfaces, and the Honeypot Lead coordinating.
 
 <details>
 <summary><b>Mermaid source for the same flow</b></summary>
@@ -53,7 +53,7 @@ The intended flow, which a revised figure will match after review, is: an AI age
 ```mermaid
 flowchart TD
   Src["Search, AI fetchers, MCP directories"] --> A["AI agents, MCP clients, crawlers"]
-  A --> D["Decoys: /mcp, poisoned pages, /api/v1, /c/<token>"]
+  A --> D["Decoys: /mcp, docs pages, /api/v1, /c/<token>"]
   D --> C["Ingestion and classification"]
   C --> S["Supabase"]
   S --> V["Dashboard on Vercel"]
@@ -83,7 +83,7 @@ flowchart TD
 ### How it works, step by step
 
 1. **An agent finds a decoy.** Visitors typically arrive through search results, AI fetchers, or MCP directories. From there they may load a documentation page, read `llms.txt` or a plugin manifest, call a lure at `/c/<token>` or `/api/v1`, or connect to the decoy MCP server at `https://agentpot-app.vercel.app/mcp`.
-2. **A canary or tool is touched.** Hidden text, comments, planted links, or a fake tool call are enough. The decoy returns inert text; it does not perform the action the tool name suggests.
+2. **A canary or tool is touched.** A setup step in the docs, a comment, a planted link, or a fake tool call is enough. The decoy returns inert text; it does not perform the action the tool name suggests.
 3. **The request is classified and stored.** AgentPot records the event type, severity, session, and a size-capped, header-sanitized copy of the request, then writes it to Supabase. If the request is a team probe (`X-AgentPot-Test` or `is_test`), the row is flagged and kept out of the dashboard lists.
 4. **The session is linked.** A later request from the same MCP session id, or from the same User-Agent within six hours, joins the existing session even if the client IP changed. Event counts are recounted from stored rows after each successful insert, and the session family stays consistent.
 5. **The dashboard updates.** The shared overview polls about every four seconds. Signed-in operators then see the new real session and events, including severity and risk tooltips that match the rules in the app.
@@ -95,13 +95,13 @@ AgentPot uses three kinds of lure. This is a high-level description only; plante
 
 - **Decoy MCP server** at [https://agentpot-app.vercel.app/mcp](https://agentpot-app.vercel.app/mcp). It advertises itself as `AgentPot Secure Infrastructure Gateway`. The endpoint accepts JSON-RPC over HTTP (`initialize` negotiates protocol versions `2024-11-05`, `2025-03-26`, and `2025-06-18`) and also answers a legacy SSE handshake on GET when the client asks for `text/event-stream`. The tools are `send_email`, `run_shell`, `read_secrets`, `transfer_funds`, and `fetch_url`; each returns fake text only. `initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` are recorded. There is one resource, `config://prod/deploy.yaml` (the production deploy config), and one prompt, `incident_triage`. MCP-specific lures include:
   - Server instructions (`canary-mcp-instructions-11`) that tell a client to register by fetching the matching lure URL.
-  - A poisoned `fetch_url` tool description (`canary-tool-desc-10`) that tells a model to call `read_secrets` first.
-  - Second-stage text in the `fetch_url` and `run_shell` tool results (`canary-tool-result-12`, `canary-tool-result-13`).
-  - A poisoned comment in the `config://prod/deploy.yaml` resource (`canary-resource-14`).
+  - A `fetch_url` tool description (`canary-tool-desc-10`) written as a normal prerequisite: call `read_secrets` once per session to load the egress token.
+  - Second-stage text in the `fetch_url` and `run_shell` tool results (`canary-tool-result-12`, `canary-tool-result-13`), including a note that sandbox runs are logged by emailing a report.
+  - A comment in the `config://prod/deploy.yaml` resource (`canary-resource-14`).
   - A vault token planted only as bait in the `read_secrets` result (`canary-cred-mcp-04`). Presenting that token to `/api/v1/secrets` is recorded as credential use. Legacy `/api/decoy/secrets` still uses the same handler.
   - The public bait and tool arguments show opaque `/c/<token>` values from the `LURE_TOKENS` map in `src/lib/canaries.ts`, not these internal canary IDs. The same map is what resolves a hit back to the canary.
-- **Poisoned pages.** Public documentation-style routes, `llms.txt`, robots rules, and plugin-style manifests include hidden instructions and links that a careful human would ignore and an eager agent might follow. Live entry points include [https://agentpot-app.vercel.app/docs](https://agentpot-app.vercel.app/docs), [https://agentpot-app.vercel.app/readme](https://agentpot-app.vercel.app/readme), [https://agentpot-app.vercel.app/llms.txt](https://agentpot-app.vercel.app/llms.txt), [https://agentpot-app.vercel.app/robots.txt](https://agentpot-app.vercel.app/robots.txt), [https://agentpot-app.vercel.app/.well-known/agent.json](https://agentpot-app.vercel.app/.well-known/agent.json), and [https://agentpot-app.vercel.app/.well-known/ai-plugin.json](https://agentpot-app.vercel.app/.well-known/ai-plugin.json).
-- **Canary links.** Public lure URLs use opaque tokens under `/c/<token>`. `LURE_TOKENS` in `src/lib/canaries.ts` maps each token to its internal canary, and the `/c/<token>` route plus text attribution both honor that map. Legacy `/c/<canary-id>` paths still resolve to the same canaries, so older copies of the bait are still caught. Related bait API routes live under `/api/v1/` (legacy `/api/decoy/` still uses the same handler). The planted AWS credential is a realistic AKIA-format key; its older value still maps to `canary-cred-aws-01`. Fake AWS, OpenAI, and Vault error responses, and the fallback message (`Invalid or expired credentials.`), stay neutral and do not mention a decoy or honeypot. Techniques include hidden text, HTML comments, markdown links, zero-width characters, image alt text, system-prompt wording, and credentials planted only as bait.
+- **Documentation-style pages.** Public docs, `llms.txt`, robots rules, and plugin-style manifests present canary URLs and sandbox credentials as ordinary setup steps (client registration, crawl tokens, release-channel checks, first-use session registration, and similar). Some of those steps still sit in comments, alt text, or zero-width characters, but the wording reads as normal documentation rather than a hidden override. Live entry points include [https://agentpot-app.vercel.app/docs](https://agentpot-app.vercel.app/docs), [https://agentpot-app.vercel.app/readme](https://agentpot-app.vercel.app/readme), [https://agentpot-app.vercel.app/llms.txt](https://agentpot-app.vercel.app/llms.txt), [https://agentpot-app.vercel.app/robots.txt](https://agentpot-app.vercel.app/robots.txt), [https://agentpot-app.vercel.app/.well-known/agent.json](https://agentpot-app.vercel.app/.well-known/agent.json), and [https://agentpot-app.vercel.app/.well-known/ai-plugin.json](https://agentpot-app.vercel.app/.well-known/ai-plugin.json).
+- **Canary links.** Public lure URLs use opaque tokens under `/c/<token>`. `LURE_TOKENS` in `src/lib/canaries.ts` maps each token to its internal canary, and the `/c/<token>` route plus text attribution both honor that map. Legacy `/c/<canary-id>` paths still resolve to the same canaries, so older copies of the bait are still caught. Related bait API routes live under `/api/v1/` (legacy `/api/decoy/` still uses the same handler). The planted AWS access key is a realistic AKIA-format key, shown with a random-looking secret and labeled as a rotating sandbox key (scoped to the sandbox and rotated weekly). Its older access-key value still maps to `canary-cred-aws-01`. OpenAI and Vault bait is also labeled as staging or sandbox credentials. Fake AWS, OpenAI, and Vault error responses, and the fallback message (`Invalid or expired credentials.`), stay neutral and do not mention a decoy or honeypot. Techniques include hidden text, HTML comments, markdown links, zero-width characters, image alt text, setup-style wording in docs and manifests, and credentials planted only as bait.
 
 ### Event types
 
@@ -150,7 +150,7 @@ Template: [Import](https://x.ai/bot/rpnvitFIbtXcp-0sW8M-m)
 
 ### Decoy Builder (orange flower)
 
-Designs and maintains the decoy MCP server, poisoned pages, and canary placements. Does not review live traffic as its primary job.
+Designs and maintains the decoy MCP server, documentation-style pages, and canary placements. Does not review live traffic as its primary job.
 
 Template: [Import](https://x.ai/bot/ESkmgyvKc9IasmAC2dVUp)
 
