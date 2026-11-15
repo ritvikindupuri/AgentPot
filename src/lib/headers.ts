@@ -6,6 +6,7 @@
 
 const STRIP_EXACT = new Set([
   'authorization',
+  'forwarded',
   'proxy-authorization',
   'www-authenticate',
   'authentication',

@@ -14,6 +14,7 @@ describe('sanitizeHeaders', () => {
       'x-forwarded-for': '203.0.113.10',
       'x-forwarded-host': 'agentpot-app.vercel.app',
       'x-forwarded-proto': 'https',
+      forwarded: 'for=203.0.113.10;sig=should-not-keep',
       'x-forwarded-authorization': 'Bearer should-not-keep',
       authorization: 'Bearer secret-token',
       cookie: 'session=abc',
@@ -32,6 +33,7 @@ describe('sanitizeHeaders', () => {
     expect(cleaned['x-forwarded-for']).toBe('203.0.113.10');
     expect(cleaned['x-forwarded-host']).toBe('agentpot-app.vercel.app');
     expect(cleaned['x-forwarded-proto']).toBe('https');
+    expect(cleaned.forwarded).toBeUndefined();
     expect(cleaned.authorization).toBeUndefined();
     expect(cleaned.cookie).toBeUndefined();
     expect(cleaned['set-cookie']).toBeUndefined();
