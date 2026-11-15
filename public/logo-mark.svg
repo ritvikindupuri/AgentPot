@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none">
+  <title>AgentPot</title>
+  <path d="M27.26 15.2V22.5L16 29L4.74 22.5V9.5L16 3L21.1 5.95" fill="none" stroke="#EDEEF0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="16" cy="16" r="5.2" fill="none" stroke="#EDEEF0" stroke-width="2.2"/>
+  <circle cx="16" cy="16" r="1.9" fill="#5B6CFF"/>
+  <circle cx="26.2" cy="8.9" r="2.3" fill="#5B6CFF"/>
+</svg>
