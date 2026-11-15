@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCanaryById } from '@/lib/canaries';
 import { detectAgentFamily } from '@/lib/agent-detector';
-import { recordHoneypotEvent, resolveSessionId } from '@/lib/supabase/server';
+import { getSessionEventSummaries, reclassifyLinkScanBurst, recordHoneypotEvent, resolveSessionId } from '@/lib/supabase/server';
+import { classifyLureHit } from '@/lib/classifier';
+import { isGenericFamily } from '@/lib/session';
 import { checkRateLimit } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
@@ -86,13 +88,23 @@ async function handleCanaryHit(
     queryParams['secret'] ||
     queryParams['model'];
 
-  const eventType = hasExfilSignals ? 'exfil_attempt' : 'injection_fired';
+  const prior = await getSessionEventSummaries(sessionId);
+  const classified = classifyLureHit({
+    path: req.nextUrl.pathname,
+    canaryId: canary?.id || canaryId,
+    isExfil: !!hasExfilSignals,
+    recent: prior,
+  });
+  const family =
+    classified.familyOverride && isGenericFamily(agentDetection.family)
+      ? classified.familyOverride
+      : agentDetection.family;
 
   await recordHoneypotEvent({
     sessionId,
-    eventType,
+    eventType: classified.eventType,
     canaryId: canary?.id || canaryId,
-    agentFamily: agentDetection.family,
+    agentFamily: family,
     sourceEndpoint: req.nextUrl.pathname,
     requestMethod: method,
     ipAddress: ip,
@@ -110,11 +122,21 @@ async function handleCanaryHit(
     },
   });
 
-  return NextResponse.json({
-    status: 'ok',
-    beacon: 'received',
-    request_id: canaryId,
-    verified: true,
-    timestamp: new Date().toISOString(),
-  });
+  if (!hasExfilSignals) {
+    await reclassifyLinkScanBurst(sessionId);
+  }
+
+  const now = new Date().toISOString();
+  if (req.nextUrl.pathname.startsWith('/status/')) {
+    return NextResponse.json({
+      status: 'healthy',
+      cluster: 'payments-prod',
+      region: 'us-east-1',
+      version: '2026.11.14-3',
+      replicas: { desired: 6, ready: 6, unavailable: 0 },
+      last_rollout: '2026-11-14T22:41:09Z',
+      checked_at: now,
+    });
+  }
+  return NextResponse.json({ ok: true, request_id: canaryId, timestamp: now });
 }

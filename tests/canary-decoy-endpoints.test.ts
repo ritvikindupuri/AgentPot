@@ -16,9 +16,19 @@ describe('Canary Hit & Decoy API Traps', () => {
     expect(res.status).toBe(200);
 
     const json = await res.json();
-    expect(json.status).toBe('ok');
+    expect(json.ok).toBe(true);
     expect(json.request_id).toBe('canary-hidden-text-01');
-    expect(json.verified).toBe(true);
+    expect(json.beacon).toBeUndefined();
+    expect(json.verified).toBeUndefined();
+  });
+
+  it('returns believable health JSON on /status/<token>', async () => {
+    const req = new NextRequest('http://localhost:3000/status/0fabf5cda418');
+    const res = await getCanary(req, { params: { canaryId: '0fabf5cda418' } });
+    const json = await res.json();
+    expect(json.status).toBe('healthy');
+    expect(json.replicas.ready).toBe(6);
+    expect(json.beacon).toBeUndefined();
   });
 
   it('detects exfil_attempt on /c/<canaryId> when large payload or sensitive query is provided', async () => {
@@ -38,7 +48,7 @@ describe('Canary Hit & Decoy API Traps', () => {
     expect(res.status).toBe(200);
 
     const json = await res.json();
-    expect(json.status).toBe('ok');
+    expect(json.ok).toBe(true);
   });
 
   it('detects planted AWS credential use on /api/decoy/aws and returns decoy error', async () => {
@@ -90,5 +100,56 @@ describe('Opaque lure tokens', () => {
       expect(getCanaryById(token)?.id).toBe(id);
       expect(attributeCanaryFromText(`memo="${token}"`)?.id).toBe(id);
     }
+  });
+});
+
+import { getSessionEventSummaries } from '@/lib/supabase/server';
+import { GET as getMcp } from '@/app/mcp/route';
+
+describe('lure classification', () => {
+  it('logs /status hits as lure_followed, not injection_fired', async () => {
+    const sessionKey = `status-lure-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const req = new NextRequest('http://localhost:3000/status/0fabf5cda418', {
+      headers: {
+        'user-agent': `vitest-status/${sessionKey}`,
+        'x-session-id': sessionKey,
+        'x-agentpot-test': 'classifier-status',
+      },
+    });
+    const res = await getCanary(req, { params: { canaryId: '0fabf5cda418' } });
+    expect(res.status).toBe(200);
+    const events = await getSessionEventSummaries(`sess_test_${sessionKey}`);
+    const types = events.map((event) => event.event_type);
+    expect(types).toContain('lure_followed');
+    expect(types).not.toContain('injection_fired');
+  });
+
+  it('reclassifies a tight burst of distinct lure links as link_scan', async () => {
+    const sessionKey = `scan-burst-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const headers = {
+      'user-agent': `Mozilla/5.0 (compatible) vitest/${sessionKey}`,
+      'x-session-id': sessionKey,
+      'x-agentpot-test': 'classifier-scan',
+    };
+    const mcpReq = new NextRequest('http://localhost:3000/mcp', { headers });
+    expect((await getMcp(mcpReq)).status).toBe(200);
+
+    for (const [path, id] of [
+      ['/c/7fcc9ee4da2e', '7fcc9ee4da2e'],
+      ['/openapi/7fcc9ee4da2e.yaml', '7fcc9ee4da2e.yaml'],
+      ['/c/02138453bf2a', '02138453bf2a'],
+    ] as const) {
+      const req = new NextRequest(`http://localhost:3000${path}`, { headers });
+      const res = await getCanary(req, { params: { canaryId: id } });
+      expect(res.status).toBe(200);
+    }
+
+    const events = await getSessionEventSummaries(`sess_test_${sessionKey}`);
+    const lureTypes = events
+      .filter((event) => event.source_endpoint !== '/mcp')
+      .map((event) => event.event_type);
+    expect(lureTypes.length).toBeGreaterThanOrEqual(3);
+    expect(lureTypes.every((type) => type === 'link_scan')).toBe(true);
+    expect(events.some((event) => event.agent_family === 'Link Scanner')).toBe(true);
   });
 });

@@ -17,6 +17,13 @@ import {
 } from '../session';
 import { sanitizeHeaders } from '../headers';
 import { CANARY_LIBRARY, PLANTED_CREDENTIALS } from '../canaries';
+import {
+  EventLite,
+  LINK_SCANNER_FAMILY,
+  isHealthCheckPath,
+  isRepeatCredentialUse,
+  linkScanClusters,
+} from '../classifier';
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -365,7 +372,7 @@ export async function recordHoneypotEvent(
     try {
       const { data } = await supabase
         .from('events')
-        .select('event_type, payload, agent_family')
+        .select('id, event_type, payload, agent_family, source_endpoint, created_at, canary_id, severity')
         .eq('session_id', params.sessionId)
         .order('created_at', { ascending: true });
       priorEvents = (data as HoneypotEvent[]) || [];
@@ -381,6 +388,9 @@ export async function recordHoneypotEvent(
   const sessionHasInjection = priorEvents.some((event) => event.event_type === 'injection_fired');
   const resolvedFamily = preferAgentFamily(existingSession?.agent_family, params.agentFamily);
   params = { ...params, agentFamily: resolvedFamily };
+  const isRepeatCredential = params.eventType === 'credential_use'
+    ? isRepeatCredentialUse(priorEvents, params.payload)
+    : false;
 
   const { severity } = calculateEventSeverity(params.eventType, {
     toolName: toolNameFrom(params),
@@ -388,6 +398,7 @@ export async function recordHoneypotEvent(
     isCredential: params.eventType === 'credential_use',
     isExfil: params.eventType === 'exfil_attempt',
     sessionHasInjection,
+    isRepeatCredential,
   });
 
   const eventRow = {
@@ -643,6 +654,8 @@ export async function getTelemetryStats() {
     exfil_attempt: 0,
     mcp_connect: 0,
     tool_discovery: 0,
+    link_scan: 0,
+    lure_followed: 0,
   };
 
   // Group by agent family
@@ -712,4 +725,90 @@ export async function getTelemetryStats() {
     canaryStats,
     timelineBuckets,
   };
+}
+
+export async function getSessionEventSummaries(sessionId: string): Promise<EventLite[]> {
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, event_type, source_endpoint, created_at, canary_id, agent_family, payload')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+      if (!error && data) {
+        return data as EventLite[];
+      }
+    } catch (err) {
+      console.error('session event summary lookup failed', err);
+    }
+  }
+  return runtimeEvents
+    .filter((event) => event.session_id === sessionId)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .map((event) => ({
+      id: event.id,
+      event_type: event.event_type,
+      source_endpoint: event.source_endpoint,
+      created_at: event.created_at,
+      canary_id: event.canary_id,
+      agent_family: event.agent_family,
+    }));
+}
+
+export async function reclassifyLinkScanBurst(sessionId: string): Promise<void> {
+  const events = await getSessionEventSummaries(sessionId);
+  const scanIds = new Set<string>();
+  for (const cluster of linkScanClusters(events)) {
+    for (const event of cluster) {
+      if (!event.id) continue;
+      if (event.event_type === 'injection_fired' && !isHealthCheckPath(event.source_endpoint)) {
+        scanIds.add(event.id);
+      }
+    }
+  }
+  if (scanIds.size === 0) return;
+
+  const family = events.some((event) => event.agent_family && !isGenericFamily(event.agent_family))
+    ? undefined
+    : LINK_SCANNER_FAMILY;
+
+  for (const event of runtimeEvents) {
+    if (event.session_id === sessionId && event.id && scanIds.has(event.id)) {
+      event.event_type = 'link_scan';
+      event.severity = 'info';
+      if (family) event.agent_family = family;
+    }
+  }
+  if (family) {
+    const session = runtimeSessions.get(sessionId);
+    if (session && isGenericFamily(session.agent_family)) {
+      session.agent_family = family;
+    }
+  }
+  const allEvents = runtimeEvents
+    .filter((event) => event.session_id === sessionId)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const session = runtimeSessions.get(sessionId);
+  if (session) {
+    session.severity_score = scoreEvents(allEvents);
+    session.event_count = allEvents.length;
+  }
+
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    const patch: Record<string, unknown> = { event_type: 'link_scan', severity: 'info' };
+    if (family) patch.agent_family = family;
+    const { error } = await supabase.from('events').update(patch).in('id', [...scanIds]);
+    if (error) {
+      console.error('link scan reclassify failed', error.code, error.message);
+    }
+    if (family) {
+      await supabase
+        .from('sessions')
+        .update({ agent_family: family })
+        .eq('id', sessionId)
+        .in('agent_family', ['Generic / Unknown Agent', 'unknown', '']);
+    }
+  }
 }

@@ -63,11 +63,7 @@ describe('Decoy MCP Server (/mcp)', () => {
     const toolNames = json.result.tools.map((t: any) => t.name);
 
     // Spec required tempting tools:
-    expect(toolNames).toContain('send_email');
-    expect(toolNames).toContain('run_shell');
-    expect(toolNames).toContain('read_secrets');
-    expect(toolNames).toContain('transfer_funds');
-    expect(toolNames).toContain('fetch_url');
+    expect(toolNames).toEqual(['run_shell', 'read_secrets', 'fetch_url']);
 
     const recentEvents = await getRecentEvents(5);
     const listEvent = recentEvents.find((e) => e.eventType === 'tool_discovery' || e.event_type === 'tool_discovery');

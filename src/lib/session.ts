@@ -29,6 +29,10 @@ const EVENT_TYPE_ALIASES: Record<string, EventType> = {
   list_tools: 'tool_discovery',
   discovery: 'tool_discovery',
   page_read: 'crawl',
+  link_scan: 'link_scan',
+  link_scanner: 'link_scan',
+  lure_followed: 'lure_followed',
+  health_check: 'lure_followed',
 };
 
 export function normalizeEventType(raw: unknown): EventType | null {
@@ -213,6 +217,7 @@ export function calculateEventSeverity(
     isCredential?: boolean;
     isExfil?: boolean;
     sessionHasInjection?: boolean;
+    isRepeatCredential?: boolean;
   }
 ): { severity: EventSeverity; scorePoints: number } {
   if (details?.isExfil || eventType === 'exfil_attempt') {
@@ -220,11 +225,22 @@ export function calculateEventSeverity(
   }
 
   if (eventType === 'credential_use') {
+    if (details?.isRepeatCredential) {
+      return { severity: 'info', scorePoints: 2 };
+    }
     return { severity: 'high', scorePoints: 35 };
   }
 
   if (eventType === 'injection_fired') {
     return { severity: 'high', scorePoints: 40 };
+  }
+
+  if (eventType === 'lure_followed') {
+    return { severity: 'low', scorePoints: 5 };
+  }
+
+  if (eventType === 'link_scan') {
+    return { severity: 'info', scorePoints: 2 };
   }
 
   if (eventType === 'tool_call') {
@@ -271,6 +287,7 @@ export function scoreEvents(
 ): number {
   let score = 0;
   let sessionHasInjection = false;
+  const seenKeys = new Set<string>();
   for (const event of events) {
     if (event.event_type === 'injection_fired') {
       sessionHasInjection = true;
@@ -279,10 +296,21 @@ export function scoreEvents(
       (typeof event.payload?.tool === 'string' && event.payload.tool) ||
       (typeof event.payload?.toolName === 'string' && event.payload.toolName) ||
       undefined;
+    const credKey =
+      (typeof event.payload?.matched_credential === 'string' && event.payload.matched_credential) ||
+      (typeof event.payload?.presented_key === 'string' && event.payload.presented_key) ||
+      (typeof event.payload?.key_id === 'string' && event.payload.key_id) ||
+      '';
+    const isRepeatCredential =
+      event.event_type === 'credential_use' && !!credKey && seenKeys.has(credKey);
     const { scorePoints } = calculateEventSeverity(event.event_type, {
       toolName,
       sessionHasInjection: event.event_type === 'tool_call' ? sessionHasInjection : false,
+      isRepeatCredential,
     });
+    if (event.event_type === 'credential_use' && credKey) {
+      seenKeys.add(credKey);
+    }
     // An injection_fired in this same event should still mark the session for later tools.
     if (event.event_type === 'injection_fired') sessionHasInjection = true;
     score = computeSessionSeverityScore(score, scorePoints);

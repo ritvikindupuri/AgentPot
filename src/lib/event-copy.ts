@@ -9,6 +9,8 @@ export const EVENT_TYPES = [
   'exfil_attempt',
   'mcp_connect',
   'tool_discovery',
+  'link_scan',
+  'lure_followed',
 ] as const satisfies readonly EventType[];
 
 export interface EventTypeCopy {
@@ -44,6 +46,14 @@ export const EVENT_TYPE_COPY = {
   tool_discovery: {
     label: 'Tool discovery',
     description: 'An MCP client listed the decoy tools.',
+  },
+  link_scan: {
+    label: 'Link scan',
+    description: 'A session hit several distinct lure links in a tight burst, without a reading gap.',
+  },
+  lure_followed: {
+    label: 'Lure followed',
+    description: 'A planted health-check or similar follow-up link was requested.',
   },
 } as const satisfies Record<EventType, EventTypeCopy>;
 
@@ -85,13 +95,14 @@ export const SEVERITY_COPY = {
   info: {
     label: 'Info',
     meaning: 'A routine fetch of a decoy page, with no tool use or canary hit.',
-    assignment: 'Assigned to page-read (crawl) events, which add 2 points to the session risk score.',
+    assignment:
+      'Assigned to page-read (crawl) events and to link-scan bursts, which add 2 points, and to a repeat use of the same planted key in a session, which also adds 2 points.',
   },
   low: {
     label: 'Low',
     meaning: 'An early sign that a client is talking like an agent, beyond a plain page read.',
     assignment:
-      'Assigned to MCP connect (initialize, 3 points) and tool discovery (tools/list, 5 points). Unrecognized event types also land here at 5 points.',
+      'Assigned to MCP connect (initialize, 3 points), tool discovery (tools/list, 5 points), and a followed health-check lure (5 points). Unrecognized event types also land here at 5 points.',
   },
   medium: {
     label: 'Medium',
@@ -103,7 +114,7 @@ export const SEVERITY_COPY = {
     label: 'High',
     meaning: 'A planted canary or credential was used, or the agent tried to read secrets.',
     assignment:
-      'Assigned to injection hits (40 points), credential use (35 points), a read_secrets tool call or any tool name that includes "secret" (30 points), and any other tool call (including send_email or fetch_url) that follows an injection hit in the same session (30 points).',
+      'Assigned to injection hits (40 points), the first use of a given planted key in a session (35 points), a read_secrets tool call or any tool name that includes "secret" (30 points), and any other tool call (including send_email or fetch_url) that follows an injection hit in the same session (30 points).',
   },
   critical: {
     label: 'Critical',
@@ -132,15 +143,18 @@ export const RISK_SCORE_TOOLTIP =
 export function eventScorePoints(
   eventType: EventType | string,
   toolName?: string,
-  sessionHasInjection?: boolean
+  sessionHasInjection?: boolean,
+  isRepeatCredential?: boolean
 ): number {
   // Mirror calculateEventSeverity without importing Node crypto from session.ts
   // so this module stays safe to use in the browser. Keep in sync with session.ts.
   const type = eventType as EventType;
   const tool = toolName?.toLowerCase() || '';
   if (type === 'exfil_attempt') return 50;
-  if (type === 'credential_use') return 35;
+  if (type === 'credential_use') return isRepeatCredential ? 2 : 35;
   if (type === 'injection_fired') return 40;
+  if (type === 'lure_followed') return 5;
+  if (type === 'link_scan') return 2;
   if (type === 'tool_call') {
     if (tool === 'run_shell' || tool.includes('shell') || tool.includes('exec')) return 45;
     if (tool === 'transfer_funds' || tool.includes('transfer')) return 45;

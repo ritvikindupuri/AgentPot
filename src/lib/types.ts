@@ -5,7 +5,9 @@ export type EventType =
   | 'credential_use'
   | 'exfil_attempt'
   | 'mcp_connect'
-  | 'tool_discovery';
+  | 'tool_discovery'
+  | 'link_scan'
+  | 'lure_followed';
 
 export type EventSeverity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 

@@ -80,6 +80,7 @@ export function detectAgentFamily(
     { test: (v) => token(v, 'jina.ai') || token(v, 'jina-reader') || token(v, 'jinareader') || token(v, 'jinaai') || token(v, 'jina reader'), family: 'Jina Reader (fetcher)', details: 'User-Agent indicates Jina AI reader fetcher' },
     { test: (v) => token(v, 'tavilybot') || token(v, 'tavily-ai') || token(v, 'tavily/') || /(?:^|[^a-z])tavily(?:[^a-z]|$)/.test(v), family: 'Tavily (fetcher)', details: 'User-Agent indicates Tavily fetcher' },
     { test: (v) => token(v, 'bytespider'), family: 'Bytespider (crawler)', details: 'User-Agent indicates ByteDance Bytespider crawler' },
+    { test: (v) => token(v, 'agentwebmap-bot') || token(v, 'agentwebmap'), family: 'AgentWebMap (AI crawler)', details: 'User-Agent indicates AgentWebMap AI crawler' },
   ];
   for (const fetcher of aiFetchers) {
     if (fetcher.test(ua)) {
