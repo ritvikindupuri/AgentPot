@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1080" viewBox="0 0 1180 1080" role="img" aria-label="How AgentPot works">
+<rect width="1180" height="1080" fill="#FFFFFF"/>
+<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#9AA0A6"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: ui-sans-serif, Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; fill: #1F2328; }
+    .title { font-size: 28px; font-weight: 700; }
+    .name { font-size: 14px; font-weight: 700; }
+    .cap { font-size: 12px; fill: #5B616A; }
+    .group { font-size: 12px; font-weight: 600; fill: #5B616A; }
+    .icon-label { font-size: 11px; fill: #5B616A; }
+    .callout { font-size: 12.5px; fill: #1F2328; }
+    .box-title { font-size: 14px; font-weight: 700; }
+    .box-cap { font-size: 12px; fill: #5B616A; }
+  </style>
+<text class="title" x="590.0" y="48" text-anchor="middle">How AgentPot works</text>
+  <g transform="translate(210,118)">
+    <circle cx="0" cy="-10" r="9" fill="#6B7280"/>
+    <path d="M-16 18c0-9 7-14 16-14s16 5 16 14" fill="#6B7280"/>
+  </g>
+<text class="name" x="210" y="156" text-anchor="middle">You (Ritvik)</text>
+<text class="cap" x="210" y="174" text-anchor="middle">Owner</text>
+<g transform="translate(520,118)">
+    <rect x="-28" y="-28" width="56" height="56" rx="12" fill="#EEF0FF" stroke="#D6DBFF"/>
+    <circle cx="-8" cy="-4" r="6" fill="#5B6CFF"/>
+    <circle cx="10" cy="-4" r="6" fill="#5B6CFF"/>
+    <rect x="-14" y="8" width="28" height="8" rx="4" fill="#5B6CFF"/>
+  </g>
+<text class="name" x="520" y="156" text-anchor="middle">AI agents</text>
+<text class="cap" x="520" y="174" text-anchor="middle">MCP clients and crawlers</text>
+<line x1="210" y1="184" x2="210" y2="228" stroke="#9AA0A6" stroke-width="1.8"  marker-end="url(#arrow)"/>
+<line x1="520" y1="184" x2="520" y2="228" stroke="#9AA0A6" stroke-width="1.8"  marker-end="url(#arrow)"/>
+  <rect x="70" y="228" width="640" height="560" rx="16" fill="#F7F8F9" stroke="#E4E6EA"/>
+<text class="group" x="86" y="250">The honeypot</text>
+<rect x="130" y="268" width="520" height="118" rx="12" fill="#FFFFFF" stroke="#E4E6EA"/>
+<text class="box-title" x="390" y="296" text-anchor="middle">Decoys</text>
+<text class="box-cap" x="390" y="314" text-anchor="middle">MCP server, poisoned pages, and canaries</text>
+  <g transform="translate(230.0,350.0)">
+    <g transform="translate(-18.0,-18.0) scale(1.5000)">
+  <rect x="1" y="1" width="22" height="22" rx="5" fill="#0A0B0E"/>
+  <circle cx="8" cy="8" r="2.1" fill="#5B6CFF"/>
+  <circle cx="16" cy="8" r="2.1" fill="#5B6CFF"/>
+  <circle cx="12" cy="16" r="2.1" fill="#5B6CFF"/>
+  <path d="M9.7 9.3 11.2 14.1M14.3 9.3 12.8 14.1M10.1 8h3.8" stroke="#5B6CFF" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+
+</g>
+    <text class="icon-label" y="34.0" text-anchor="middle">MCP</text>
+  </g>
+<g transform="translate(390,350)">
+    <rect x="-16" y="-18" width="32" height="36" rx="3" fill="#111827"/>
+    <rect x="-11" y="-13" width="22" height="3" rx="1" fill="#EDEEF0"/>
+    <rect x="-11" y="-6" width="16" height="2" rx="1" fill="#9BA1AE"/>
+    <rect x="-11" y="-1" width="18" height="2" rx="1" fill="#9BA1AE"/>
+    <text class="icon-label" y="34" text-anchor="middle">Pages</text>
+  </g>
+<g transform="translate(550,350)">
+    <path d="M0,-16 L6,-4 H18 L8,4 L12,16 L0,8 L-12,16 L-8,4 L-18,-4 H-6 Z" fill="#5B6CFF"/>
+    <text class="icon-label" y="34" text-anchor="middle">Canaries</text>
+  </g>
+<line x1="390" y1="386" x2="390" y2="430" stroke="#9AA0A6" stroke-width="1.8"  marker-end="url(#arrow)"/>
+<rect x="190" y="430" width="400" height="78" rx="12" fill="#FFFFFF" stroke="#E4E6EA"/>
+<text class="box-title" x="390" y="462" text-anchor="middle">Event classification</text>
+<text class="box-cap" x="390" y="482" text-anchor="middle">Type, severity, and session</text>
+<line x1="390" y1="508" x2="390" y2="548" stroke="#9AA0A6" stroke-width="1.8"  marker-end="url(#arrow)"/>
+<rect x="190" y="548" width="400" height="88" rx="12" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <g transform="translate(300.0,592.0)">
+    <g transform="translate(-17.0,-17.0) scale(1.4167)">
+  <path fill="#3FCF8E" d="M13.6 1.2c.4-.6 1.4-.3 1.4.5v7.6h6.3c.8 0 1.2 1 .6 1.5l-9.9 11.9c-.5.6-1.4.3-1.4-.5v-7.6H4.3c-.8 0-1.2-1-.6-1.5L13.6 1.2z"/>
+
+</g>
+    
+  </g>
+<text class="box-title" x="430" y="586" text-anchor="middle">Supabase</text>
+<text class="box-cap" x="430" y="606" text-anchor="middle">Events and sessions, with a 30-day cleanup</text>
+<line x1="390" y1="636" x2="390" y2="676" stroke="#9AA0A6" stroke-width="1.8"  marker-end="url(#arrow)"/>
+<rect x="190" y="676" width="400" height="88" rx="12" fill="#FFFFFF" stroke="#E4E6EA"/>
+  <g transform="translate(250.0,720.0)">
+    <g transform="translate(-14.0,-14.0) scale(1.1667)">
+  <circle cx="12" cy="12" r="12" fill="#000"/>
+  <path fill="#fff" d="M16.7 17.6V8.9h-1.5l-5.3 7.4h-.1V8.9H8.3v8.7h1.5l5.4-7.5h.1v7.5h1.4z"/>
+
+</g>
+    <text class="icon-label" y="30.0" text-anchor="middle">Next.js</text>
+  </g>
+  <g transform="translate(330.0,720.0)">
+    <g transform="translate(-14.0,-14.0) scale(1.1667)">
+  <path fill="#000000" d="M12 2 24 22H0L12 2z"/>
+
+</g>
+    <text class="icon-label" y="30.0" text-anchor="middle">Vercel</text>
+  </g>
+<text class="box-title" x="470" y="712" text-anchor="middle">Dashboard</text>
+<text class="box-cap" x="470" y="732" text-anchor="middle">Shared live view</text>
+  <rect x="740" y="228" width="390" height="560" rx="16" fill="#F7F8F9" stroke="#E4E6EA"/>
+<text class="group" x="756" y="250">Grok Bot team</text>
+  <g transform="translate(935,330)">
+    <title>Honeypot Lead</title>
+    <g transform="rotate(22)"><path d="M 25.11,-21.50 Q 31.18,-18.00 31.18,-11.00 L 31.18,11.00 Q 31.18,18.00 25.11,21.50 L 6.06,32.50 Q 0.00,36.00 -6.06,32.50 L -25.11,21.50 Q -31.18,18.00 -31.18,11.00 L -31.18,-11.00 Q -31.18,-18.00 -25.11,-21.50 L -6.06,-32.50 Q -0.00,-36.00 6.06,-32.50 Z" fill="#F5C451"/></g>
+    <rect x="-11" y="-8" width="7" height="16" rx="3.5" fill="#FFFFFF"/><rect x="4" y="-8" width="7" height="16" rx="3.5" fill="#FFFFFF"/>
+    <text class="name" y="44" text-anchor="middle">Honeypot Lead</text>
+    <text class="cap" y="62" text-anchor="middle">Coordinates the team</text>
+  </g>
+  <g transform="translate(840,490)">
+    <title>Decoy Builder</title>
+    <g transform="rotate(-8)"><ellipse cx="0" cy="-22" rx="12" ry="18" fill="#F97316" transform="rotate(-90)"/><ellipse cx="0" cy="-22" rx="12" ry="18" fill="#F97316" transform="rotate(-18)"/><ellipse cx="0" cy="-22" rx="12" ry="18" fill="#F97316" transform="rotate(54)"/><ellipse cx="0" cy="-22" rx="12" ry="18" fill="#F97316" transform="rotate(126)"/><ellipse cx="0" cy="-22" rx="12" ry="18" fill="#F97316" transform="rotate(198)"/><circle cx="0" cy="0" r="14" fill="#F97316"/></g>
+    <rect x="-11" y="-8" width="7" height="16" rx="3.5" fill="#FFFFFF"/><rect x="4" y="-8" width="7" height="16" rx="3.5" fill="#FFFFFF"/>
+    <text class="name" y="44" text-anchor="middle">Decoy Builder</text>
+    <text class="cap" y="62" text-anchor="middle">Designs the lures</text>
+  </g>
+  <g transform="translate(1030,490)">
+    <title>Attack Analyst</title>
+    <g transform="rotate(-12)"><path fill="#FB2B3E" d="M0,-34 L28,-24 C28,-24 28,6 28,10 C16,28 4,34 0,36 C-4,34 -16,28 -28,10 C-28,6 -28,-24 -28,-24 Z"/></g>
+    <rect x="-11" y="-8" width="7" height="16" rx="3.5" fill="#FFFFFF"/><rect x="4" y="-8" width="7" height="16" rx="3.5" fill="#FFFFFF"/>
+    <text class="name" y="44" text-anchor="middle">Attack Analyst</text>
+    <text class="cap" y="62" text-anchor="middle">Reads the traffic</text>
+  </g>
+  <g transform="translate(935,680)">
+    <title>Agent Tester</title>
+    <g transform="rotate(-28)"><rect x="-38" y="-22" width="76" height="44" rx="22" fill="#22C55E"/></g>
+    <rect x="-11" y="-8" width="7" height="16" rx="3.5" fill="#FFFFFF"/><rect x="4" y="-8" width="7" height="16" rx="3.5" fill="#FFFFFF"/>
+    <text class="name" y="44" text-anchor="middle">Agent Tester</text>
+    <text class="cap" y="62" text-anchor="middle">Probes the surfaces</text>
+  </g>
+  <rect x="70" y="816" width="1060" height="110" rx="16" fill="#F7F8F9" stroke="#E4E6EA"/>
+<text class="group" x="86" y="838">Stack</text>
+  <g transform="translate(180.0,874.0)">
+    <g transform="translate(-18.0,-18.0) scale(1.5000)">
+  <circle cx="12" cy="12" r="12" fill="#000"/>
+  <path fill="#fff" d="M16.7 17.6V8.9h-1.5l-5.3 7.4h-.1V8.9H8.3v8.7h1.5l5.4-7.5h.1v7.5h1.4z"/>
+
+</g>
+    <text class="icon-label" y="34.0" text-anchor="middle">Next.js</text>
+  </g>
+  <g transform="translate(340.0,874.0)">
+    <g transform="translate(-18.0,-18.0) scale(1.5000)">
+  <path fill="#000000" d="M12 2 24 22H0L12 2z"/>
+
+</g>
+    <text class="icon-label" y="34.0" text-anchor="middle">Vercel</text>
+  </g>
+  <g transform="translate(500.0,874.0)">
+    <g transform="translate(-18.0,-18.0) scale(1.5000)">
+  <path fill="#3FCF8E" d="M13.6 1.2c.4-.6 1.4-.3 1.4.5v7.6h6.3c.8 0 1.2 1 .6 1.5l-9.9 11.9c-.5.6-1.4.3-1.4-.5v-7.6H4.3c-.8 0-1.2-1-.6-1.5L13.6 1.2z"/>
+
+</g>
+    <text class="icon-label" y="34.0" text-anchor="middle">Supabase</text>
+  </g>
+  <g transform="translate(660.0,874.0)">
+    <g transform="translate(-18.0,-18.0) scale(1.5000)"><path fill="#181717" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></g>
+    <text class="icon-label" y="34.0" text-anchor="middle">GitHub</text>
+  </g>
+  <g transform="translate(820.0,874.0)">
+    <g transform="translate(-18.0,-18.0) scale(1.5000)">
+  <rect x="1" y="1" width="22" height="22" rx="5" fill="#0A0B0E"/>
+  <circle cx="8" cy="8" r="2.1" fill="#5B6CFF"/>
+  <circle cx="16" cy="8" r="2.1" fill="#5B6CFF"/>
+  <circle cx="12" cy="16" r="2.1" fill="#5B6CFF"/>
+  <path d="M9.7 9.3 11.2 14.1M14.3 9.3 12.8 14.1M10.1 8h3.8" stroke="#5B6CFF" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+
+</g>
+    <text class="icon-label" y="34.0" text-anchor="middle">MCP</text>
+  </g>
+  <g transform="translate(70,948)">
+    <rect x="0" y="0" width="340" height="54" rx="10" fill="#FFF4E8" stroke="#F3D5B0"/>
+    <text class="callout" x="12" y="22"><tspan fill="#C2410C" font-weight="600">1. </tspan>An agent finds a decoy.<tspan x="12" dy="16">The lure stays inert.</tspan></text>
+  </g>
+  <g transform="translate(420,948)">
+    <rect x="0" y="0" width="350" height="54" rx="10" fill="#FFF4E8" stroke="#F3D5B0"/>
+    <text class="callout" x="12" y="22"><tspan fill="#C2410C" font-weight="600">2. </tspan>The touch is classified<tspan x="12" dy="16">and stored in Supabase.</tspan></text>
+  </g>
+  <g transform="translate(780,948)">
+    <rect x="0" y="0" width="350" height="54" rx="10" fill="#FFF4E8" stroke="#F3D5B0"/>
+    <text class="callout" x="12" y="22"><tspan fill="#C2410C" font-weight="600">3. </tspan>You review the dashboard.<tspan x="12" dy="16">The team tends the lures.</tspan></text>
+  </g>
+</svg>

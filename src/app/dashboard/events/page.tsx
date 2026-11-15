@@ -16,7 +16,9 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/Table';
-import { EventType, EventSeverity } from '@/lib/types';
+import { EVENT_TYPES, getEventTypeCopy } from '@/lib/event-copy';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { formatFullTimestamp } from '@/lib/format';
 
 const SEVERITY_TABS = [
   { id: 'all', label: 'All' },
@@ -29,13 +31,7 @@ const SEVERITY_TABS = [
 
 const EVENT_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'All events' },
-  { value: 'crawl', label: 'Crawl' },
-  { value: 'injection_fired', label: 'Injection' },
-  { value: 'tool_call', label: 'Tool call' },
-  { value: 'credential_use', label: 'Credential' },
-  { value: 'exfil_attempt', label: 'Exfiltration' },
-  { value: 'mcp_connect', label: 'MCP connect' },
-  { value: 'tool_discovery', label: 'Tool discovery' },
+  ...EVENT_TYPES.map((value) => ({ value, label: getEventTypeCopy(value).label })),
 ];
 
 function formatTime(isoString: string): string {
@@ -173,8 +169,10 @@ function EventsContent() {
                       key={event.id}
                       onClick={() => openSessionDrawer(event.session_id)}
                     >
-                      <TableCell className="text-text-faint font-mono text-xs whitespace-nowrap">
-                        <span title={event.created_at}>{formatTime(event.created_at)}</span>
+                      <TableCell className="text-text-faint text-xs whitespace-nowrap">
+                        <Tooltip content={formatFullTimestamp(event.created_at)}>
+                          <time dateTime={event.created_at}>{formatTime(event.created_at)}</time>
+                        </Tooltip>
                       </TableCell>
                       <TableCell>
                         <EventBadge type={event.event_type} />

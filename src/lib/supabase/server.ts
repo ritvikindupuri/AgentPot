@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { HoneypotEvent, Session, EventType, EventSeverity } from '../types';
 import { calculateEventSeverity, computeSessionSeverityScore } from '../session';
+import { sanitizeHeaders } from '../headers';
 import { CANARY_LIBRARY } from '../canaries';
 
 const supabaseUrl =
@@ -72,7 +73,7 @@ export async function recordHoneypotEvent(
 ): Promise<HoneypotEvent> {
   params = {
     ...params,
-    headers: capJson(params.headers, 4096),
+    headers: capJson(sanitizeHeaders(params.headers), 4096),
     payload: capJson(params.payload, 8192),
     clientInfo: capJson(params.clientInfo, 2048),
     userAgent: params.userAgent ? params.userAgent.slice(0, 512) : params.userAgent,
@@ -394,8 +395,12 @@ export async function getTelemetryStats() {
   // Canary attribution hits
   const canaryHits: Record<string, number> = {};
 
-  // Timeline (hourly buckets for last 24h)
-  const timelineBuckets: Record<string, number> = {};
+  // Timeline (hourly buckets for last 24h), with type and severity breakdowns
+  const timelineBuckets: Record<string, {
+    count: number;
+    byType: Record<string, number>;
+    bySeverity: Record<string, number>;
+  }> = {};
 
   for (const event of events) {
     eventTypeCounts[event.event_type] = (eventTypeCounts[event.event_type] || 0) + 1;
@@ -416,7 +421,14 @@ export async function getTelemetryStats() {
     }
 
     const hour = event.created_at.slice(0, 13) + ':00';
-    timelineBuckets[hour] = (timelineBuckets[hour] || 0) + 1;
+    if (!timelineBuckets[hour]) {
+      timelineBuckets[hour] = { count: 0, byType: {}, bySeverity: {} };
+    }
+    const bucket = timelineBuckets[hour];
+    bucket.count += 1;
+    bucket.byType[event.event_type] = (bucket.byType[event.event_type] || 0) + 1;
+    const sev = event.severity || 'info';
+    bucket.bySeverity[sev] = (bucket.bySeverity[sev] || 0) + 1;
   }
 
   // Canary stats

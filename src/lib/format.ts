@@ -34,3 +34,40 @@ export function formatShortTime(dateStr: string): string {
     return dateStr;
   }
 }
+
+export function formatFriendlyTime(dateStr?: string): string {
+  if (!dateStr) return '-';
+  try {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+export function formatFullTimestamp(dateStr?: string): string {
+  if (!dateStr) return '-';
+  try {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'long' });
+  } catch {
+    return dateStr;
+  }
+}
+
+export function formatHourTick(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour: 'numeric' });
+}
+
+export function formatHourRange(start: Date, end: Date): string {
+  const opts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+  return `${start.toLocaleTimeString(undefined, opts)} to ${end.toLocaleTimeString(undefined, opts)}`;
+}

@@ -1,5 +1,15 @@
+'use client';
+
 import React from 'react';
 import { EventSeverity, EventType } from '@/lib/types';
+import {
+  getEventTypeCopy,
+  eventTypeSummary,
+  getSeverityCopy,
+  severityTooltipText,
+  SEVERITY_COLORS,
+} from '@/lib/event-copy';
+import { Tooltip } from './Tooltip';
 
 interface SeverityPillProps {
   severity: EventSeverity | string;
@@ -7,54 +17,33 @@ interface SeverityPillProps {
 }
 
 export function SeverityPill({ severity, className = '' }: SeverityPillProps) {
-  const sev = (severity || 'info').toLowerCase();
-
-  let textCol = '#9BA1AE';
-  let bgCol = 'rgba(155,161,174,0.10)';
-  let dotCol = '#6B7280';
-
-  if (sev === 'critical') {
-    textCol = '#FF6369';
-    bgCol = 'rgba(255,99,105,0.12)';
-    dotCol = '#FF6369';
-  } else if (sev === 'high') {
-    textCol = '#FF9B52';
-    bgCol = 'rgba(255,155,82,0.12)';
-    dotCol = '#FF9B52';
-  } else if (sev === 'medium') {
-    textCol = '#F5C451';
-    bgCol = 'rgba(245,196,81,0.12)';
-    dotCol = '#F5C451';
-  } else if (sev === 'low') {
-    textCol = '#6CB6FF';
-    bgCol = 'rgba(108,182,255,0.12)';
-    dotCol = '#6CB6FF';
-  }
+  const copy = getSeverityCopy(severity);
+  const key = (severity || 'info').toLowerCase() as keyof typeof SEVERITY_COLORS;
+  const colors = SEVERITY_COLORS[key] ?? SEVERITY_COLORS.info;
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 h-5 px-2 rounded-full text-xs font-medium whitespace-nowrap select-none ${className}`}
-      style={{ color: textCol, backgroundColor: bgCol }}
+    <Tooltip
+      content={
+        <span>
+          <span className="font-medium text-text">{copy.label}. </span>
+          {severityTooltipText(severity)}
+        </span>
+      }
     >
       <span
-        className="w-1.5 h-1.5 rounded-full shrink-0"
-        style={{ backgroundColor: dotCol }}
-        aria-hidden="true"
-      />
-      <span>{sev}</span>
-    </span>
+        className={`inline-flex items-center gap-1.5 h-5 px-2 rounded-full text-xs font-medium whitespace-nowrap select-none ${className}`}
+        style={{ color: colors.text, backgroundColor: colors.bg }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ backgroundColor: colors.dot }}
+          aria-hidden="true"
+        />
+        <span>{copy.label}</span>
+      </span>
+    </Tooltip>
   );
 }
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  crawl: 'Crawl',
-  injection_fired: 'Injection',
-  tool_call: 'Tool call',
-  credential_use: 'Credential',
-  exfil_attempt: 'Exfiltration',
-  mcp_connect: 'MCP connect',
-  tool_discovery: 'Tool discovery',
-};
 
 interface EventBadgeProps {
   type: EventType | string;
@@ -62,28 +51,32 @@ interface EventBadgeProps {
 }
 
 export function EventBadge({ type, className = '' }: EventBadgeProps) {
-  const label = EVENT_TYPE_LABELS[type] || type;
+  const copy = getEventTypeCopy(type);
 
   return (
-    <span
-      className={`inline-flex items-center h-5 px-2 rounded-full text-xs font-medium text-text-muted bg-white/[0.05] whitespace-nowrap select-none ${className}`}
-    >
-      {label}
-    </span>
+    <Tooltip content={eventTypeSummary(type)}>
+      <span
+        className={`inline-flex items-center h-5 px-2 rounded-full text-xs font-medium text-text-muted bg-white/[0.05] whitespace-nowrap select-none ${className}`}
+      >
+        {copy.label}
+      </span>
+    </Tooltip>
   );
 }
 
 interface NeutralBadgeProps {
   label: string;
   className?: string;
+  tooltip?: string;
 }
 
-export function NeutralBadge({ label, className = '' }: NeutralBadgeProps) {
-  return (
+export function NeutralBadge({ label, className = '', tooltip }: NeutralBadgeProps) {
+  const pill = (
     <span
       className={`inline-flex items-center h-5 px-2 rounded-full text-xs font-medium text-text-muted bg-white/[0.05] whitespace-nowrap select-none ${className}`}
     >
       {label}
     </span>
   );
+  return tooltip ? <Tooltip content={tooltip}>{pill}</Tooltip> : pill;
 }

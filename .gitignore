@@ -16,3 +16,6 @@ test-results
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# Supabase CLI cache
+supabase/.temp

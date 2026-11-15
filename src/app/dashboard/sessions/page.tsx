@@ -3,7 +3,9 @@
 import React, { useMemo } from 'react';
 import { useDashboardData } from '@/components/dashboard/DashboardContext';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { formatRelativeTime } from '@/lib/format';
+import { formatRelativeTime, formatFullTimestamp } from '@/lib/format';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { RISK_SCORE_TOOLTIP } from '@/lib/event-copy';
 import {
   TableContainer,
   TableHead,
@@ -62,7 +64,11 @@ export default function SessionsPage() {
         <TableContainer>
           <TableHead>
             <TableHeaderCell>Agent</TableHeaderCell>
-            <TableHeaderCell className="w-36">Risk</TableHeaderCell>
+            <TableHeaderCell className="w-36">
+              <Tooltip content={RISK_SCORE_TOOLTIP}>
+                <span>Risk</span>
+              </Tooltip>
+            </TableHeaderCell>
             <TableHeaderCell align="right" className="w-20">Events</TableHeaderCell>
             <TableHeaderCell className="w-28">First seen</TableHeaderCell>
             <TableHeaderCell className="w-28">Last seen</TableHeaderCell>
@@ -88,9 +94,11 @@ export default function SessionsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-text w-6 text-right tabular-nums">
-                        {riskScore}
-                      </span>
+                      <Tooltip content={RISK_SCORE_TOOLTIP}>
+                        <span className="font-mono text-xs text-text w-6 text-right tabular-nums">
+                          {riskScore}
+                        </span>
+                      </Tooltip>
                       <div className="w-12 h-1 bg-border rounded-full overflow-hidden shrink-0">
                         <div
                           className="h-full rounded-full"
@@ -106,10 +114,14 @@ export default function SessionsPage() {
                     {session.event_count}
                   </TableCell>
                   <TableCell className="text-text-faint text-xs whitespace-nowrap">
-                    {formatRelativeTime(session.first_seen)}
+                    <Tooltip content={formatFullTimestamp(session.first_seen)}>
+                      <time dateTime={session.first_seen}>{formatRelativeTime(session.first_seen)}</time>
+                    </Tooltip>
                   </TableCell>
                   <TableCell className="text-text-faint text-xs whitespace-nowrap">
-                    {formatRelativeTime(session.last_seen)}
+                    <Tooltip content={formatFullTimestamp(session.last_seen)}>
+                      <time dateTime={session.last_seen}>{formatRelativeTime(session.last_seen)}</time>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               );

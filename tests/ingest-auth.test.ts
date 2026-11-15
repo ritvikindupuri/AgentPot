@@ -123,4 +123,44 @@ describe('Ingest API Authentication (/api/ingest)', () => {
     expect(storedEvent?.canary_id).toBeNull();
     expect(storedEvent?.payload?.reported_canary_id).toBe('unknown-fake-canary-999');
   });
+
+  it('strips sensitive request headers before storing the event', async () => {
+    const req = new NextRequest('http://localhost:3000/api/ingest', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'Bearer agy_agent_test_key_valid_2026',
+        'user-agent': 'Header-Sanitize-Agent/1.0',
+        accept: 'application/json',
+        cookie: 'should-not-be-stored=1',
+        'x-vercel-oidc-token': 'eyJhbGciOi-fake',
+        'x-vercel-sc-headers': '{"authorization":"Bearer x"}',
+        'x-forwarded-for': '198.51.100.20',
+        'x-api-key': 'should-not-be-stored',
+      },
+      body: JSON.stringify({
+        event_type: 'crawl',
+        agent_name: 'Header-Sanitize-Tester',
+        source_endpoint: '/llms.txt',
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    const events = await getRecentEvents(20);
+    const storedEvent = events.find((e) => e.id === json.event_id);
+    expect(storedEvent).toBeDefined();
+    const headers = storedEvent?.headers || {};
+    const names = Object.keys(headers).map((k) => k.toLowerCase());
+    expect(names).toContain('user-agent');
+    expect(names).toContain('accept');
+    expect(names).toContain('x-forwarded-for');
+    expect(names).not.toContain('authorization');
+    expect(names).not.toContain('cookie');
+    expect(names).not.toContain('x-vercel-oidc-token');
+    expect(names).not.toContain('x-vercel-sc-headers');
+    expect(names).not.toContain('x-api-key');
+    expect(names.some((n) => n.startsWith('x-vercel-'))).toBe(false);
+  });
 });

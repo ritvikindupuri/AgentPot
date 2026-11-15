@@ -3,6 +3,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { HoneypotEvent, Session } from '@/lib/types';
 
+export interface TimelineBucket {
+  count: number;
+  byType: Record<string, number>;
+  bySeverity: Record<string, number>;
+}
+
 export interface TelemetryStats {
   totalEvents: number;
   totalSessions: number;
@@ -11,7 +17,7 @@ export interface TelemetryStats {
   toolCallCounts: Record<string, number>;
   credentialUses: Record<string, number>;
   canaryStats: Array<{ canary: any; hits: number }>;
-  timelineBuckets: Record<string, number>;
+  timelineBuckets: Record<string, TimelineBucket | number>;
 }
 
 interface DashboardContextType {

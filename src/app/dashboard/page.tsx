@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { useDashboardData } from '@/components/dashboard/DashboardContext';
 import { KpiTile } from '@/components/ui/KpiTile';
@@ -15,11 +15,12 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/Table';
-import { formatShortRelativeTime } from '@/lib/format';
+import { formatShortRelativeTime, formatFullTimestamp } from '@/lib/format';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { ActivityChart } from '@/components/dashboard/ActivityChart';
 
 export default function OverviewPage() {
   const { events, stats, openSessionDrawer } = useDashboardData();
-  const [hoveredBar, setHoveredBar] = useState<{ label: string; count: number } | null>(null);
 
   // 1. KPI row
   const totalEvents = stats?.totalEvents ?? events.length;
@@ -30,28 +31,6 @@ export default function OverviewPage() {
   const canaryHits = injectionCount + credCount;
 
   const criticalCount = events.filter((e) => e.severity === 'critical').length;
-
-  // 2. Activity chart: 24 hourly buckets
-  const now = new Date();
-  const buckets: Array<{ key: string; label: string; count: number; isCurrent: boolean }> = [];
-  let totalActivity = 0;
-
-  for (let i = 23; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * 60 * 60 * 1000);
-    const key = d.toISOString().slice(0, 13) + ':00';
-    const hours = d.getHours().toString().padStart(2, '0');
-    const label = `${hours}:00`;
-    const count = stats?.timelineBuckets?.[key] || 0;
-    totalActivity += count;
-    buckets.push({
-      key,
-      label,
-      count,
-      isCurrent: i === 0,
-    });
-  }
-
-  const maxCount = Math.max(...buckets.map((b) => b.count), 1);
 
   // 3. Recent events: latest 8
   const recentEvents = events.slice(0, 8);
@@ -74,67 +53,7 @@ export default function OverviewPage() {
 
       {/* 2. Activity Chart */}
       <Card title="Activity" action={<span>Last 24 hours</span>}>
-        {totalActivity === 0 ? (
-          <EmptyState
-            title="No activity yet"
-            sentence="Events appear here as agents reach your decoys."
-          />
-        ) : (
-          <div className="pt-2">
-            <div className="relative h-[120px] w-full">
-              {hoveredBar && (
-                <div className="absolute top-0 right-0 text-xs font-mono text-text-faint bg-surface border border-border px-2 py-0.5 rounded">
-                  {hoveredBar.label} · {hoveredBar.count} events
-                </div>
-              )}
-              <svg
-                className="w-full h-[95px] overflow-visible"
-                viewBox="0 0 720 80"
-                preserveAspectRatio="none"
-              >
-                {/* Baseline */}
-                <line
-                  x1="0"
-                  y1="79"
-                  x2="720"
-                  y2="79"
-                  stroke="var(--border)"
-                  strokeWidth="1"
-                />
-                {buckets.map((b, idx) => {
-                  const barWidth = 720 / buckets.length;
-                  const innerWidth = Math.max(2, barWidth - 4);
-                  const barHeight = b.count > 0 ? Math.max(4, (b.count / maxCount) * 72) : 0;
-                  const x = idx * barWidth + 2;
-                  const y = 79 - barHeight;
-
-                  return (
-                    <rect
-                      key={b.key}
-                      x={x}
-                      y={y}
-                      width={innerWidth}
-                      height={barHeight}
-                      fill="var(--accent)"
-                      fillOpacity={b.isCurrent ? 1.0 : 0.7}
-                      className="cursor-pointer transition-opacity duration-120 hover:opacity-100"
-                      onMouseEnter={() => setHoveredBar({ label: b.label, count: b.count })}
-                      onMouseLeave={() => setHoveredBar(null)}
-                    >
-                      <title>{`${b.label} · ${b.count} events`}</title>
-                    </rect>
-                  );
-                })}
-              </svg>
-              {/* 3 x-labels: -24h, -12h, now */}
-              <div className="flex justify-between items-center text-xs text-text-faint mt-2 select-none">
-                <span>-24h</span>
-                <span>-12h</span>
-                <span>now</span>
-              </div>
-            </div>
-          </div>
-        )}
+        <ActivityChart stats={stats} />
       </Card>
 
       {/* 3. Two columns (60/40) */}
@@ -182,7 +101,9 @@ export default function OverviewPage() {
                       onClick={() => openSessionDrawer(event.session_id)}
                     >
                       <TableCell className="text-text-faint text-xs whitespace-nowrap">
-                        {formatShortRelativeTime(event.created_at)}
+                        <Tooltip content={formatFullTimestamp(event.created_at)}>
+                          <time dateTime={event.created_at}>{formatShortRelativeTime(event.created_at)}</time>
+                        </Tooltip>
                       </TableCell>
                       <TableCell>
                         <EventBadge type={event.event_type} />

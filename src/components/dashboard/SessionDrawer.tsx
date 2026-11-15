@@ -5,8 +5,11 @@ import { X, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { Session, HoneypotEvent } from '@/lib/types';
 import { SeverityPill, EventBadge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
+import { Tooltip } from '../ui/Tooltip';
+import { EventDetail } from './EventDetail';
 import { useDashboardData } from './DashboardContext';
-import { formatRelativeTime, formatShortTime } from '@/lib/format';
+import { formatRelativeTime, formatFriendlyTime, formatFullTimestamp } from '@/lib/format';
+import { RISK_SCORE_TOOLTIP } from '@/lib/event-copy';
 
 export function SessionDrawer() {
   const { selectedSessionId, closeSessionDrawer } = useDashboardData();
@@ -14,7 +17,6 @@ export function SessionDrawer() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
-  const [expandedHeaders, setExpandedHeaders] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -54,7 +56,6 @@ export function SessionDrawer() {
   };
 
   const toggleEvent = (id: string) => setExpandedEvents((prev) => ({ ...prev, [id]: !prev[id] }));
-  const toggleHeaders = (id: string) => setExpandedHeaders((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const session = data?.session;
   const events = data?.events || [];
@@ -104,16 +105,28 @@ export function SessionDrawer() {
                   <div className="font-mono text-[13px] text-text mt-0.5 truncate">{session?.ip_address || '127.0.0.1'}</div>
                 </div>
                 <div>
-                  <div className="text-text-faint leading-4">Risk</div>
-                  <div className="text-[13px] font-semibold text-text mt-0.5">{session?.severity_score ?? 0}</div>
+                  <div className="text-text-faint leading-4">
+                    <Tooltip content={RISK_SCORE_TOOLTIP}>
+                      <span>Risk</span>
+                    </Tooltip>
+                  </div>
+                  <div className="text-[13px] font-semibold text-text mt-0.5 tabular-nums">{session?.severity_score ?? 0}</div>
                 </div>
                 <div>
                   <div className="text-text-faint leading-4">First seen</div>
-                  <div className="text-[13px] text-text mt-0.5">{formatRelativeTime(session?.first_seen)}</div>
+                  <div className="text-[13px] text-text mt-0.5">
+                    <Tooltip content={formatFullTimestamp(session?.first_seen)}>
+                      <time dateTime={session?.first_seen}>{formatRelativeTime(session?.first_seen)}</time>
+                    </Tooltip>
+                  </div>
                 </div>
                 <div>
                   <div className="text-text-faint leading-4">Last seen</div>
-                  <div className="text-[13px] text-text mt-0.5">{formatRelativeTime(session?.last_seen)}</div>
+                  <div className="text-[13px] text-text mt-0.5">
+                    <Tooltip content={formatFullTimestamp(session?.last_seen)}>
+                      <time dateTime={session?.last_seen}>{formatRelativeTime(session?.last_seen)}</time>
+                    </Tooltip>
+                  </div>
                 </div>
                 <div>
                   <div className="text-text-faint leading-4">Events</div>
@@ -137,7 +150,6 @@ export function SessionDrawer() {
                   <div className="relative pl-4 space-y-4 border-l border-border-strong ml-2">
                     {events.map((event) => {
                       const isExpanded = !!expandedEvents[event.id];
-                      const areHeadersExpanded = !!expandedHeaders[event.id];
                       const sev = event.severity || 'info';
                       const dotColor =
                         sev === 'critical' ? '#FF6369' :
@@ -165,9 +177,11 @@ export function SessionDrawer() {
                             className="cursor-pointer select-none space-y-1"
                           >
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-text-faint font-mono text-[12px]">
-                                {formatShortTime(event.created_at)}
-                              </span>
+                              <Tooltip content={formatFullTimestamp(event.created_at)}>
+                                <time dateTime={event.created_at} className="text-text-faint text-[12px]">
+                                  {formatFriendlyTime(event.created_at)}
+                                </time>
+                              </Tooltip>
                               <EventBadge type={event.event_type} />
                               <SeverityPill severity={event.severity} />
                               <span className="ml-auto text-text-faint group-hover:text-text transition-colors">
@@ -179,36 +193,7 @@ export function SessionDrawer() {
                             </div>
                           </div>
 
-                          {isExpanded && (
-                            <div className="mt-2 space-y-2">
-                              {event.canary_id && (
-                                <div className="text-[12px]">
-                                  <span className="text-text-faint">Canary: </span>
-                                  <span className="font-mono text-accent-text">{event.canary_id}</span>
-                                </div>
-                              )}
-                              <pre className="p-2.5 bg-bg border border-border rounded-md font-mono text-[12px] text-text-muted overflow-x-auto max-h-60">
-                                {JSON.stringify(event.payload, null, 2)}
-                              </pre>
-                              {event.headers && Object.keys(event.headers).length > 0 && (
-                                <div className="pt-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleHeaders(event.id)}
-                                    className="text-[12px] text-text-faint hover:text-text flex items-center gap-1"
-                                  >
-                                    <span>Headers</span>
-                                    {areHeadersExpanded ? <ChevronDown size={12} strokeWidth={1.5} /> : <ChevronRight size={12} strokeWidth={1.5} />}
-                                  </button>
-                                  {areHeadersExpanded && (
-                                    <pre className="mt-1 p-2 bg-bg border border-border rounded-md font-mono text-[11px] text-text-faint overflow-x-auto max-h-40">
-                                      {JSON.stringify(event.headers, null, 2)}
-                                    </pre>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          {isExpanded && <EventDetail event={event} />}
                         </div>
                       );
                     })}
