@@ -36,7 +36,7 @@ export function Tooltip({ content, children, className = '', align = 'center' }:
   return (
     <span
       ref={wrapRef}
-      className={`relative inline-flex max-w-full ${className}`}
+      className={`relative inline-flex max-w-full h-full ${className}`}
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocus={show}
@@ -46,7 +46,7 @@ export function Tooltip({ content, children, className = '', align = 'center' }:
       <span
         tabIndex={0}
         aria-describedby={open ? id : undefined}
-        className="inline-flex max-w-full rounded-md outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="inline-flex max-w-full w-full h-full items-end rounded-md outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {children}
       </span>

@@ -129,7 +129,7 @@ export function ActivityChart({ stats }: ActivityChartProps) {
                 return (
                   <Tooltip
                     key={b.key}
-                    className="flex-1 h-full items-end justify-center"
+                    className="min-w-0 flex-1 h-full items-end justify-center"
                     content={
                       <span className="block text-left space-y-0.5">
                         <span className="block font-medium text-text">
@@ -147,10 +147,10 @@ export function ActivityChart({ stats }: ActivityChartProps) {
                     <button
                       type="button"
                       aria-label={`${formatHourRange(b.start, b.end)}, ${b.count} events`}
-                      className="w-full h-full flex flex-col justify-end bg-transparent border-0 p-0 cursor-pointer"
+                      className="relative w-full h-full bg-transparent border-0 p-0 cursor-pointer"
                     >
                       <span
-                        className="w-full flex flex-col-reverse overflow-hidden rounded-[2px]"
+                        className="absolute bottom-0 left-0.5 right-0.5 flex flex-col-reverse overflow-hidden rounded-[2px] pointer-events-none"
                         style={{ height }}
                       >
                         {segments.map((seg) => (
