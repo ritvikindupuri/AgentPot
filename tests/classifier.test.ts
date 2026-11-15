@@ -94,13 +94,14 @@ describe('credential use severity', () => {
     expect(isRepeatCredentialUse(prior, { matched_credential: 'key-a' })).toBe(true);
     expect(isRepeatCredentialUse(prior, { matched_credential: 'key-b' })).toBe(false);
 
+    // 35+2+35 would be 72, but a key-only session is capped at 40.
     expect(
       scoreEvents([
         { event_type: 'credential_use', payload: { matched_credential: 'key-a', method: 'initialize' } },
         { event_type: 'credential_use', payload: { matched_credential: 'key-a', method: 'tools/list' } },
         { event_type: 'credential_use', payload: { matched_credential: 'key-b', method: 'initialize' } },
       ])
-    ).toBe(72);
+    ).toBe(40);
   });
 
   it('keeps read_secrets tool calls high', () => {

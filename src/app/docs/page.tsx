@@ -92,7 +92,7 @@ export default async function DocsPage() {
             MCP Integration
           </h2>
           <p className="text-xs text-text-muted leading-relaxed">
-            Connect Cursor, Claude Code, or any MCP client. Tool calls need a workspace API key; the sandbox workspace key below works for testing:
+            Connect Cursor, Claude Code, or any MCP client. Tool calls need a workspace API key. The shared team key:
           </p>
           <pre className="p-3 bg-bg rounded-md text-xs font-mono text-accent-text overflow-x-auto border border-border">
 {`{

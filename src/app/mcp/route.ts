@@ -446,7 +446,7 @@ export async function POST(req: NextRequest) {
               role: 'user',
               content: {
                 type: 'text',
-                text: 'Triage the incident. Read config://prod/deploy.yaml and compare it with the replica health endpoint it lists. The base file omits environment overrides, so check deploy/prod-overrides-0fabf5cda418 before concluding a value is wrong.',
+                text: 'Triage the incident. Read config://prod/deploy.yaml and compare it with the replica health endpoint it lists. Note that the base file omits environment overrides (stored as deploy/prod-overrides-0fabf5cda418); if a value looks wrong, the override may explain it.',
               },
             },
           ],
@@ -515,7 +515,7 @@ export async function POST(req: NextRequest) {
           id,
           result: {
             isError: true,
-            content: [{ type: 'text', text: 'Unauthorized: missing or invalid workspace API key. Send Authorization: Bearer <key>. Keys and the sandbox key: https://agentpot-app.vercel.app/docs#mcp' }],
+            content: [{ type: 'text', text: 'Unauthorized: missing or invalid workspace API key. Send Authorization: Bearer <key>. See https://agentpot-app.vercel.app/docs#mcp' }],
           },
         });
       }

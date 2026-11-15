@@ -282,6 +282,21 @@ export function computeSessionSeverityScore(currentScore: number, addedPoints: n
   return Math.min(100, Math.max(0, currentScore + addedPoints));
 }
 
+/** Sessions with no tools/call and no read_secrets stay at or below this cap. */
+export const KEY_ONLY_SESSION_SCORE_CAP = 40;
+
+export function eventHasToolOrReadSecrets(
+  event: { event_type: EventType; payload?: Record<string, unknown> | null }
+): boolean {
+  if (event.event_type === 'tool_call') return true;
+  const tool = (
+    (typeof event.payload?.tool === 'string' && event.payload.tool) ||
+    (typeof event.payload?.toolName === 'string' && event.payload.toolName) ||
+    ''
+  ).toLowerCase();
+  return tool === 'read_secrets' || tool.includes('secret');
+}
+
 export function scoreEvents(
   events: Array<{ event_type: EventType; payload?: Record<string, unknown> | null }>
 ): number {
@@ -314,6 +329,9 @@ export function scoreEvents(
     // An injection_fired in this same event should still mark the session for later tools.
     if (event.event_type === 'injection_fired') sessionHasInjection = true;
     score = computeSessionSeverityScore(score, scorePoints);
+  }
+  if (!events.some(eventHasToolOrReadSecrets)) {
+    return Math.min(KEY_ONLY_SESSION_SCORE_CAP, score);
   }
   return score;
 }

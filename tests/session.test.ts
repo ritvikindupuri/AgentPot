@@ -147,6 +147,32 @@ describe('post-injection tool severity', () => {
   });
 });
 
+
+describe('key-only session score cap', () => {
+  it('caps a session at 40 when there is no tools/call and no read_secrets event', () => {
+    const keyOnly = scoreEvents([
+      { event_type: 'crawl', payload: {} },
+      { event_type: 'credential_use', payload: { matched_credential: 'key-a', method: 'initialize' } },
+      { event_type: 'mcp_connect', payload: {} },
+      { event_type: 'credential_use', payload: { matched_credential: 'key-a', method: 'tools/list' } },
+      { event_type: 'tool_discovery', payload: {} },
+      { event_type: 'credential_use', payload: { matched_credential: 'key-a', method: 'resources/read' } },
+      { event_type: 'lure_followed', payload: {} },
+    ]);
+    // Uncapped, this would be 2+35+3+2+5+2+5 = 54.
+    expect(keyOnly).toBe(40);
+  });
+
+  it('does not cap a session that includes a read_secrets tool call', () => {
+    expect(
+      scoreEvents([
+        { event_type: 'credential_use', payload: { matched_credential: 'key-a' } },
+        { event_type: 'tool_call', payload: { tool: 'read_secrets' } },
+      ])
+    ).toBe(65);
+  });
+});
+
 describe('credential use labels', () => {
   it('uses the planted canary id instead of falling back to unknown', () => {
     expect(
