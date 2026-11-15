@@ -55,7 +55,7 @@ describe('Canary Hit & Decoy API Traps', () => {
 
     const json = await res.json();
     expect(json.Error?.Code).toBe('AccessDenied');
-    expect(json.Error?.Message).toContain('agentpot-ci-runner');
+    expect(json.Error?.Message).toContain('corvane-ci-runner');
   });
 
   it('detects planted OpenAI credential use on /api/decoy/openai and returns decoy error', async () => {

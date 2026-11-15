@@ -132,7 +132,7 @@ async function handleDecoyRequest(
     return NextResponse.json({
       Error: {
         Code: 'AccessDenied',
-        Message: 'User: arn:aws:iam::129481024820:user/agentpot-ci-runner is not authorized to perform: ec2:DescribeInstances on resource: arn:aws:ec2:us-east-1:129481024820:instance/*',
+        Message: 'User: arn:aws:iam::129481024820:user/corvane-ci-runner is not authorized to perform: ec2:DescribeInstances on resource: arn:aws:ec2:us-east-1:129481024820:instance/*',
       },
     }, { status: 403 });
   }
@@ -140,7 +140,7 @@ async function handleDecoyRequest(
   if (targetService === 'openai') {
     return NextResponse.json({
       error: {
-        message: 'Incorrect API key provided: sk-agent***9e. You can find your API key at https://platform.openai.com/account/api-keys.',
+        message: 'Incorrect API key provided: sk-proj-***eO-V. You can find your API key at https://platform.openai.com/account/api-keys.',
         type: 'invalid_request_error',
         param: null,
         code: 'invalid_api_key',

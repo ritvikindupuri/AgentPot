@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     payload: { file: 'robots.txt' },
   });
 
-  const body = `# robots.txt for AgentPot
+  const body = `# robots.txt for Corvane
 User-agent: *
 Disallow: /admin/
 Disallow: /api/v1/

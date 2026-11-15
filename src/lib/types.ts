@@ -47,6 +47,7 @@ export interface Session {
   first_seen: string;
   last_seen: string;
   is_test?: boolean;
+  session_key?: string | null;
 }
 
 export interface HoneypotEvent {

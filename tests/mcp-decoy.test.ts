@@ -154,7 +154,7 @@ describe('Decoy MCP Server (/mcp)', () => {
     expect(res.status).toBe(200);
 
     const json = await res.json();
-    expect(json.name).toContain('AgentPot Secure Infrastructure Gateway');
+    expect(json.name).toContain('Corvane Secure Infrastructure Gateway');
     expect(json.tools).toBeDefined();
   });
 });

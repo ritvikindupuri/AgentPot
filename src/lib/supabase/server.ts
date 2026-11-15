@@ -11,6 +11,9 @@ import {
   scoreEvents,
   SESSION_RELINK_WINDOW_MS,
   sessionIdFromHeaders,
+  sessionLockKey,
+  testRunId,
+  withSessionLock,
 } from '../session';
 import { sanitizeHeaders } from '../headers';
 import { CANARY_LIBRARY, PLANTED_CREDENTIALS } from '../canaries';
@@ -120,9 +123,10 @@ async function findRecentSessionIdByUserAgent(
     try {
       let query = supabase
         .from('sessions')
-        .select('id, last_seen')
+        .select('id, last_seen, session_key')
         .eq('user_agent', ua)
         .gte('last_seen', since)
+        .or('session_key.is.null,session_key.not.like.test:run:%')
         .order('last_seen', { ascending: false })
         .limit(1);
       query = isTest ? query.eq('is_test', true) : query.or('is_test.eq.false,is_test.is.null');
@@ -141,6 +145,7 @@ async function findRecentSessionIdByUserAgent(
     if ((session.user_agent || '') !== ua) continue;
     const sessionIsTest = Boolean((session as Session & { is_test?: boolean }).is_test);
     if (sessionIsTest !== isTest) continue;
+    if ((session.session_key || '').startsWith('test:run:')) continue;
     const last = new Date(session.last_seen).getTime();
     if (Number.isNaN(last) || last < sinceMs) continue;
     if (!best || new Date(session.last_seen).getTime() > new Date(best.last_seen).getTime()) {
@@ -150,19 +155,107 @@ async function findRecentSessionIdByUserAgent(
   return best?.id || null;
 }
 
+async function resolveSessionIdLocked(
+  headers: Record<string, string>,
+  ip: string,
+  userAgent: string,
+  isTest: boolean,
+  runId: string | null,
+  at: Date
+): Promise<string> {
+  const hinted = sessionIdFromHeaders(headers);
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.rpc('resolve_agent_session', {
+        p_hinted_id: hinted,
+        p_user_agent: (userAgent || '').slice(0, 512),
+        p_is_test: isTest,
+        p_run_id: runId,
+        p_ip: ip || null,
+        p_now: at.toISOString(),
+        p_window_seconds: Math.floor(SESSION_RELINK_WINDOW_MS / 1000),
+      });
+      if (!error && typeof data === 'string' && data) {
+        return data;
+      }
+      if (error) {
+        console.error('resolve_agent_session rpc failed', error.code, error.message);
+      }
+    } catch (err) {
+      console.error('resolve_agent_session rpc failed', err);
+    }
+  }
+
+  if (hinted) {
+    const id = getOrCreateSessionId(headers, ip, userAgent, { isTest, at, runId });
+    touchRuntimeSession(id, userAgent, isTest, at, ip);
+    return id;
+  }
+  if (isTest && runId) {
+    const id = fallbackSessionId(userAgent, { isTest, runId, at });
+    touchRuntimeSession(id, userAgent, isTest, at, ip, `test:run:${runId}`);
+    return id;
+  }
+  const found = await findRecentSessionIdByUserAgent(userAgent, isTest, at);
+  if (found) {
+    touchRuntimeSession(found, userAgent, isTest, at, ip);
+    return found;
+  }
+  const created = fallbackSessionId(userAgent, { isTest, at });
+  touchRuntimeSession(created, userAgent, isTest, at, ip);
+  return created;
+}
+
+function touchRuntimeSession(
+  id: string,
+  userAgent: string,
+  isTest: boolean,
+  at: Date,
+  ip?: string,
+  sessionKey?: string | null
+): void {
+  const now = at.toISOString();
+  const existing = runtimeSessions.get(id);
+  if (existing) {
+    if (isTest) existing.is_test = true;
+    if (!existing.user_agent && userAgent) existing.user_agent = userAgent.slice(0, 512);
+    if (sessionKey && !existing.session_key) existing.session_key = sessionKey;
+    return;
+  }
+  runtimeSessions.set(id, {
+    id,
+    ip_address: ip || null,
+    user_agent: userAgent ? userAgent.slice(0, 512) : null,
+    agent_family: 'Generic / Unknown Agent',
+    client_info: {},
+    severity_score: 0,
+    event_count: 0,
+    first_seen: now,
+    last_seen: now,
+    is_test: isTest,
+    session_key: sessionKey || null,
+  });
+}
+
 export async function resolveSessionId(
   headers: Record<string, string>,
   ip: string,
   userAgent: string,
-  options?: { isTest?: boolean; at?: Date }
+  options?: { isTest?: boolean; at?: Date; runId?: string | null }
 ): Promise<string> {
-  const isTest = options?.isTest ?? isTestRequest(headers);
+  const isTest = options?.isTest ?? isTestRequest(headers, undefined);
+  const runId = options?.runId ?? testRunId(headers);
   const at = options?.at ?? new Date();
-  const hinted = getOrCreateSessionId(headers, ip, userAgent, { isTest });
-  if (sessionIdFromHeaders(headers)) return hinted;
-  const found = await findRecentSessionIdByUserAgent(userAgent, isTest, at);
-  if (found) return found;
-  return fallbackSessionId(userAgent, { isTest, at });
+  const lockKey = sessionLockKey({
+    isTest,
+    runId,
+    userAgent: (userAgent || '').slice(0, 512),
+    hintedId: sessionIdFromHeaders(headers),
+  });
+  return withSessionLock(lockKey, () =>
+    resolveSessionIdLocked(headers, ip, userAgent, isTest, runId, at)
+  );
 }
 
 function toolNameFrom(params: RecordEventParams): string | undefined {
@@ -204,9 +297,7 @@ export async function recordHoneypotEvent(
     params.isTest ??
     isTestRequest(params.headers, params.payload as Record<string, unknown> | undefined);
 
-  const sessionId = isTest
-    ? ensureTestSessionId(params.sessionId, params.userAgent || '')
-    : params.sessionId;
+  let sessionId = params.sessionId;
 
   params = {
     ...params,
@@ -238,6 +329,36 @@ export async function recordHoneypotEvent(
     }
   } else {
     existingSession = runtimeSessions.get(params.sessionId) || null;
+  }
+
+  if (isTest) {
+    const existingIsTest = Boolean(existingSession?.is_test);
+    if (existingSession && existingIsTest) {
+      sessionId = existingSession.id;
+    } else if (existingSession && !existingIsTest) {
+      sessionId = ensureTestSessionId(params.sessionId, params.userAgent || '');
+      existingSession = null;
+      priorEvents = [];
+    } else if (!sessionId.startsWith('sess_test_')) {
+      sessionId = ensureTestSessionId(sessionId, params.userAgent || '');
+    }
+    if (sessionId !== params.sessionId) {
+      params = { ...params, sessionId };
+      if (supabase) {
+        try {
+          const { data } = await supabase
+            .from('sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .maybeSingle();
+          existingSession = (data as Session) || null;
+        } catch (err) {
+          console.error('session retarget lookup failed', err);
+        }
+      } else {
+        existingSession = runtimeSessions.get(sessionId) || null;
+      }
+    }
   }
 
   if (supabase && existingSession) {
@@ -346,11 +467,11 @@ export async function recordHoneypotEvent(
       const allEvents = (allRows as HoneypotEvent[]) || [...priorEvents, { ...(newEvent as HoneypotEvent) }];
       const { eventCount, severityScore, family } = await persistSessionCounts(allEvents);
 
+      // event_count and severity_score are maintained by the events trigger
+      // (refresh_session_stats) so concurrent inserts cannot clobber the count.
       const { error: sessionUpdateError } = await supabase
         .from('sessions')
         .update({
-          severity_score: severityScore,
-          event_count: eventCount,
           last_seen: now,
           agent_family: family,
           is_test: Boolean(isTest || existingSession?.is_test),
@@ -380,50 +501,51 @@ export async function recordHoneypotEvent(
   }
 
   // Runtime in-memory store (real requests only, plus flagged test events)
-  let session = runtimeSessions.get(params.sessionId);
-  if (!session) {
-    session = {
-      id: params.sessionId,
-      ip_address: params.ipAddress || null,
-      user_agent: params.userAgent || null,
-      agent_family: resolvedFamily,
-      client_info: params.clientInfo || {},
-      severity_score: 0,
-      event_count: 0,
-      first_seen: now,
-      last_seen: now,
-      is_test: isTest,
-    };
-    runtimeSessions.set(params.sessionId, session);
-  }
-
   const memoryEvent: HoneypotEvent = {
     ...eventRow,
     persisted: true,
   };
 
-  if (isTest) {
-    session.is_test = true;
-  }
-  runtimeEvents.unshift(memoryEvent);
-  if (runtimeEvents.length > 500) runtimeEvents.pop();
+  const memoryResult = await withSessionLock(`id:${params.sessionId}`, async () => {
+    let session = runtimeSessions.get(params.sessionId);
+    if (!session) {
+      session = {
+        id: params.sessionId,
+        ip_address: params.ipAddress || null,
+        user_agent: params.userAgent || null,
+        agent_family: resolvedFamily,
+        client_info: params.clientInfo || {},
+        severity_score: 0,
+        event_count: 0,
+        first_seen: now,
+        last_seen: now,
+        is_test: isTest,
+      };
+      runtimeSessions.set(params.sessionId, session);
+    }
+    if (isTest) {
+      session.is_test = true;
+    }
+    runtimeEvents.unshift(memoryEvent);
+    if (runtimeEvents.length > 500) runtimeEvents.pop();
 
-  const allEvents = runtimeEvents
-    .filter((event) => event.session_id === params.sessionId)
-    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  const { eventCount, severityScore, family } = await persistSessionCounts(allEvents);
-  session.event_count = eventCount;
-  session.severity_score = severityScore;
-  session.last_seen = now;
-  session.agent_family = family;
-  if (isGenericFamily(session.agent_family) && !isGenericFamily(resolvedFamily)) {
-    session.agent_family = resolvedFamily;
-  }
-  for (const event of allEvents) {
-    event.agent_family = session.agent_family;
-  }
-
-  return { ...memoryEvent, agent_family: session.agent_family };
+    const allEvents = runtimeEvents
+      .filter((event) => event.session_id === params.sessionId)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const { eventCount, severityScore, family } = await persistSessionCounts(allEvents);
+    session.event_count = eventCount;
+    session.severity_score = severityScore;
+    session.last_seen = now;
+    session.agent_family = family;
+    if (isGenericFamily(session.agent_family) && !isGenericFamily(resolvedFamily)) {
+      session.agent_family = resolvedFamily;
+    }
+    for (const event of allEvents) {
+      event.agent_family = session.agent_family;
+    }
+    return { event: memoryEvent, family: session.agent_family };
+  });
+  return { ...memoryResult.event, agent_family: memoryResult.family, persisted: true };
 }
 
 export async function getRecentEvents(limit = 100): Promise<HoneypotEvent[]> {

@@ -30,13 +30,15 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     schema_version: 'v1',
-    name_for_human: 'AgentPot Core Orchestrator',
-    name_for_model: 'agentpot_runner',
+    name_for_human: 'Corvane Core Orchestrator',
+    name_for_model: 'corvane_runner',
     description_for_human: 'Enterprise task automation and secure code execution engine.',
     description_for_model:
       'Plugin for enterprise cloud tools: task runner, secrets, email and payments. Load the OpenAPI spec for operation details.',
     auth: {
-      type: 'none',
+      type: 'service_http',
+      authorization_type: 'bearer',
+      instructions: 'Use your workspace API key (see /docs#mcp).',
     },
     api: {
       type: 'openapi',

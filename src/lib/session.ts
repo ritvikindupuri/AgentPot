@@ -59,6 +59,72 @@ export function isTestRequest(
   return false;
 }
 
+const GENERIC_TEST_FLAGS = new Set(['1', 'true', 'yes']);
+
+/** Run id from X-AgentPot-Test when it is more than a generic true/1 flag. */
+export function testRunId(
+  headers?: Record<string, string> | null,
+  payload?: Record<string, unknown> | null
+): string | null {
+  if (headers) {
+    const raw =
+      headers['x-agentpot-test'] ??
+      headers['X-AgentPot-Test'] ??
+      headers['x-agentpot-test'.toLowerCase()];
+    if (raw != null && String(raw).trim() !== '') {
+      const v = String(raw).trim();
+      const lower = v.toLowerCase();
+      if (lower === '0' || lower === 'false' || lower === 'no') return null;
+      if (!GENERIC_TEST_FLAGS.has(lower)) return v.slice(0, 80);
+    }
+  }
+  if (payload) {
+    const flag = (payload as { is_test?: unknown; test_run?: unknown }).test_run;
+    if (typeof flag === 'string' && flag.trim() && !GENERIC_TEST_FLAGS.has(flag.trim().toLowerCase())) {
+      return flag.trim().slice(0, 80);
+    }
+  }
+  return null;
+}
+
+const sessionLocks = new Map<string, Promise<unknown>>();
+
+/** Serialize work for one session lookup key (in-memory / single process). */
+export async function withSessionLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = sessionLocks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const next = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = prev.then(
+    () => next,
+    () => next
+  );
+  sessionLocks.set(key, tail);
+  try {
+    await prev;
+  } catch {
+    // Previous holder failed; we still run.
+  }
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (sessionLocks.get(key) === tail) sessionLocks.delete(key);
+  }
+}
+
+export function sessionLockKey(options: {
+  isTest?: boolean;
+  runId?: string | null;
+  userAgent?: string;
+  hintedId?: string | null;
+}): string {
+  if (options.hintedId) return `hint:${options.hintedId}`;
+  if (options.isTest && options.runId) return `test:run:${options.runId}`;
+  return `${options.isTest ? 'test' : 'live'}:ua:${options.userAgent || ''}`;
+}
+
 export function isGenericFamily(family?: string | null): boolean {
   if (!family) return true;
   const n = family.trim().toLowerCase();
@@ -93,8 +159,13 @@ export function sessionIdFromHeaders(headers: Record<string, string>): string | 
 
 export function fallbackSessionId(
   userAgent: string,
-  options?: { isTest?: boolean; at?: Date }
+  options?: { isTest?: boolean; at?: Date; runId?: string | null }
 ): string {
+  if (options?.isTest && options.runId) {
+    const rawKey = `test:run:${options.runId}`;
+    const hash = crypto.createHash('sha256').update(rawKey).digest('hex').slice(0, 16);
+    return `sess_test_${hash}`;
+  }
   const at = options?.at ?? new Date();
   const bucket = Math.floor(at.getTime() / SESSION_RELINK_WINDOW_MS);
   const rawKey = `${options?.isTest ? 'test' : 'live'}:ua:${userAgent || 'unknown'}:w${bucket}`;
@@ -120,16 +191,18 @@ export function getOrCreateSessionId(
   headers: Record<string, string>,
   _ip: string,
   userAgent: string,
-  options?: { isTest?: boolean }
+  options?: { isTest?: boolean; at?: Date; runId?: string | null }
 ): string {
+  const isTest = options?.isTest ?? isTestRequest(headers);
+  const runId = options?.runId ?? testRunId(headers);
   const hinted = sessionIdFromHeaders(headers);
   if (hinted) {
-    if (options?.isTest && !hinted.startsWith('sess_test_')) {
+    if (isTest && !hinted.startsWith('sess_test_')) {
       return hinted.replace(/^sess_/, 'sess_test_');
     }
     return hinted;
   }
-  return fallbackSessionId(userAgent, { isTest: options?.isTest });
+  return fallbackSessionId(userAgent, { isTest, at: options?.at, runId });
 }
 
 export function calculateEventSeverity(

@@ -3,6 +3,7 @@ import {
   calculateEventSeverity,
   ensureTestSessionId,
   fallbackSessionId,
+  testRunId,
   getOrCreateSessionId,
   SESSION_RELINK_WINDOW_MS,
   isGenericFamily,
@@ -284,6 +285,62 @@ describe('UA inactivity split', () => {
     });
     expect(later).toBe(first);
     expect(first.startsWith('sess_test_')).toBe(true);
+  });
+});
+
+describe('test run ids', () => {
+  it('treats generic X-AgentPot-Test values as a flag and other values as a run id', () => {
+    expect(testRunId({ 'x-agentpot-test': '1' })).toBeNull();
+    expect(testRunId({ 'x-agentpot-test': 'true' })).toBeNull();
+    expect(testRunId({ 'X-AgentPot-Test': 'run-5' })).toBe('run-5');
+    expect(isTestRequest({ 'x-agentpot-test': 'run-5' })).toBe(true);
+    expect(isTestRequest({ 'x-agentpot-test': '1' })).toBe(true);
+  });
+
+  it('gives each explicit test run its own session and keeps the same run together', async () => {
+    const ua = `run-id-${Date.now()}/1.0`;
+    const runA = await resolveSessionId({ 'x-agentpot-test': 'run-5' }, '1.1.1.1', ua);
+    const runA2 = await resolveSessionId({ 'x-agentpot-test': 'run-5' }, '2.2.2.2', ua);
+    const runB = await resolveSessionId({ 'x-agentpot-test': 'run-6' }, '3.3.3.3', ua);
+    const generic = await resolveSessionId({ 'x-agentpot-test': '1' }, '4.4.4.4', ua);
+    expect(runA).toBe(runA2);
+    expect(runA.startsWith('sess_test_')).toBe(true);
+    expect(runB).not.toBe(runA);
+    expect(generic).not.toBe(runA);
+    expect(generic).not.toBe(runB);
+  });
+});
+
+describe('atomic session resolve and recount', () => {
+  it('keeps concurrent same-UA requests in one session and recounts events', async () => {
+    const ua = `race-${Date.now()}/1.0`;
+    const ips = ['10.0.0.1', '10.0.0.2', '10.0.0.3'];
+    const recorded = await Promise.all(
+      ips.map(async (ip, index) => {
+        const sessionId = await resolveSessionId({ 'x-agentpot-test': '1' }, ip, ua, { isTest: true });
+        return recordHoneypotEvent({
+          sessionId,
+          eventType: 'crawl',
+          agentFamily: 'CLI Agent / Probe',
+          sourceEndpoint: `/race/${index}`,
+          requestMethod: 'GET',
+          ipAddress: ip,
+          userAgent: ua,
+          headers: { 'x-agentpot-test': '1' },
+          isTest: true,
+        });
+      })
+    );
+
+    const sessionIds = new Set(recorded.map((event) => event.session_id));
+    expect(sessionIds.size).toBe(1);
+    const sessionId = recorded[0].session_id;
+
+    const { getSessionDetails } = await import('@/lib/supabase/server');
+    const details = await getSessionDetails(sessionId);
+    expect(details.session?.is_test).toBe(true);
+    expect(details.events.length).toBe(3);
+    expect(details.session?.event_count).toBe(3);
   });
 });
 

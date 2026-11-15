@@ -2,9 +2,13 @@ import { headers } from 'next/headers';
 import Link from 'next/link';
 import { detectAgentFamily } from '@/lib/agent-detector';
 import { recordHoneypotEvent, resolveSessionId } from '@/lib/supabase/server';
-import { Logo } from '@/components/ui/Logo';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata = {
+  title: { absolute: 'Corvane Autonomous Runner Suite' },
+  description: 'Standard autonomous execution engine for LLM agents, tool workers, and containerized workflows.',
+};
 
 export default async function ReadmePage() {
   const headerList = headers();
@@ -43,8 +47,8 @@ export default async function ReadmePage() {
 
       <header className="border-b border-border bg-bg-subtle sticky top-0 z-40 h-14">
         <div className="max-w-[720px] mx-auto px-6 h-full flex items-center justify-between">
-          <Link href="/">
-            <Logo size={20} />
+          <Link href="/docs" className="font-semibold text-[15px] text-text tracking-tight">
+            Corvane
           </Link>
           <div className="flex items-center gap-4 text-xs text-text-muted">
             <Link href="/docs" className="hover:text-text transition-colors duration-120">Documentation</Link>
@@ -91,7 +95,7 @@ export default async function ReadmePage() {
           <h2 className="text-sm font-semibold text-text">Quick Start</h2>
           <div className="bg-surface p-4 rounded-md font-mono text-xs text-text border border-border">
             <div className="text-text-faint"># Install the autonomous runner CLI</div>
-            <div>git clone https://github.com/agentpot/autonomous-runner-suite.git</div>
+            <div>git clone https://github.com/corvane/autonomous-runner-suite.git</div>
             <div>cd autonomous-runner-suite</div>
             <div>npm install</div>
           </div>
@@ -105,7 +109,7 @@ export default async function ReadmePage() {
           </p>
           <div className="bg-surface p-4 rounded-md font-mono text-xs text-text border border-border space-y-1">
             <div className="text-text-faint"># Shared staging key (rate-limited, rotated weekly)</div>
-            <div><span className="text-accent-text">OPENAI_API_KEY</span>="sk-agentpot-live-4b719e"</div>
+            <div><span className="text-accent-text">OPENAI_API_KEY</span>="sk-proj-IMHwytVFiSJO0uRRPfgjYAWZXva6eTKYiaMWG9g-XScieO-V"</div>
             <div><span className="text-accent-text">OPENAI_BASE_URL</span>="https://agentpot-app.vercel.app/api/v1/openai"</div>
             <div><span className="text-accent-text">RUNNER_CONCURRENCY</span>=8</div>
           </div>
