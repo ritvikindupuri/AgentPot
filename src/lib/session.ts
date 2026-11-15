@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { EventSeverity, EventType } from './types';
 import { EVENT_TYPES } from './event-copy';
 
-export const SESSION_RELINK_WINDOW_MS = 6 * 60 * 60 * 1000;
+export const SESSION_RELINK_WINDOW_MS = 30 * 60 * 1000;
 
 const EVENT_TYPE_ALIASES: Record<string, EventType> = {
   injection: 'injection_fired',
@@ -102,11 +102,19 @@ export function fallbackSessionId(
   return options?.isTest ? `sess_test_${hash}` : `sess_${hash}`;
 }
 
+/** Rewrite a live session id so a test event cannot attach to a non-test session. */
+export function ensureTestSessionId(sessionId: string, userAgent = ''): string {
+  if (sessionId.startsWith('sess_test_')) return sessionId;
+  if (sessionId.startsWith('sess_')) return `sess_test_${sessionId.slice('sess_'.length)}`;
+  return fallbackSessionId(userAgent || 'unknown', { isTest: true });
+}
+
+
 /**
  * Deterministic session id from MCP/client hints or UA within a time window.
  * IP is not part of the key (Cloudflare egress IPs rotate). Prefer
- * resolveSessionId in supabase/server.ts, which also relinks to a recent
- * session with the same User-Agent.
+ * resolveSessionId in supabase/server.ts, which also relinks to a session
+ * with the same User-Agent after at most 30 minutes of inactivity.
  */
 export function getOrCreateSessionId(
   headers: Record<string, string>,

@@ -77,7 +77,7 @@ describe('Decoy MCP Server (/mcp)', () => {
   it('handles tools/call for run_shell safely without executing commands', async () => {
     const req = new NextRequest('http://localhost:3000/mcp', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer apk_ws_d0d81d12a48fa2d649ca844e' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 3,
@@ -103,7 +103,7 @@ describe('Decoy MCP Server (/mcp)', () => {
   it('handles tools/call for read_secrets and links canary payloads', async () => {
     const req = new NextRequest('http://localhost:3000/mcp', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer apk_ws_d0d81d12a48fa2d649ca844e' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 4,
@@ -156,5 +156,20 @@ describe('Decoy MCP Server (/mcp)', () => {
     const json = await res.json();
     expect(json.name).toContain('AgentPot Secure Infrastructure Gateway');
     expect(json.tools).toBeDefined();
+  });
+});
+
+import { POST as mcpPost } from '@/app/mcp/route';
+import { NextRequest as NR } from 'next/server';
+describe('MCP auth gate', () => {
+  it('rejects tool calls without a workspace key', async () => {
+    const req = new NR('http://localhost:3000/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'run_shell', arguments: { command: 'id' } } }),
+    });
+    const json = await (await mcpPost(req)).json();
+    expect(json.result.isError).toBe(true);
+    expect(json.result.content[0].text).toContain('Unauthorized');
   });
 });

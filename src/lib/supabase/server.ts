@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { HoneypotEvent, Session, EventType, EventSeverity } from '../types';
 import {
   calculateEventSeverity,
+  ensureTestSessionId,
   fallbackSessionId,
   getOrCreateSessionId,
   isGenericFamily,
@@ -107,11 +108,12 @@ export function credentialUseLabel(event: {
 
 async function findRecentSessionIdByUserAgent(
   userAgent: string,
-  isTest: boolean
+  isTest: boolean,
+  at: Date = new Date()
 ): Promise<string | null> {
   const ua = (userAgent || '').slice(0, 512);
   if (!ua) return null;
-  const since = new Date(Date.now() - SESSION_RELINK_WINDOW_MS).toISOString();
+  const since = new Date(at.getTime() - SESSION_RELINK_WINDOW_MS).toISOString();
 
   const supabase = getSupabaseAdmin();
   if (supabase) {
@@ -134,7 +136,7 @@ async function findRecentSessionIdByUserAgent(
   }
 
   let best: Session | null = null;
-  const sinceMs = Date.now() - SESSION_RELINK_WINDOW_MS;
+  const sinceMs = at.getTime() - SESSION_RELINK_WINDOW_MS;
   for (const session of runtimeSessions.values()) {
     if ((session.user_agent || '') !== ua) continue;
     const sessionIsTest = Boolean((session as Session & { is_test?: boolean }).is_test);
@@ -152,14 +154,15 @@ export async function resolveSessionId(
   headers: Record<string, string>,
   ip: string,
   userAgent: string,
-  options?: { isTest?: boolean }
+  options?: { isTest?: boolean; at?: Date }
 ): Promise<string> {
   const isTest = options?.isTest ?? isTestRequest(headers);
+  const at = options?.at ?? new Date();
   const hinted = getOrCreateSessionId(headers, ip, userAgent, { isTest });
   if (sessionIdFromHeaders(headers)) return hinted;
-  const found = await findRecentSessionIdByUserAgent(userAgent, isTest);
+  const found = await findRecentSessionIdByUserAgent(userAgent, isTest, at);
   if (found) return found;
-  return fallbackSessionId(userAgent, { isTest });
+  return fallbackSessionId(userAgent, { isTest, at });
 }
 
 function toolNameFrom(params: RecordEventParams): string | undefined {
@@ -201,8 +204,13 @@ export async function recordHoneypotEvent(
     params.isTest ??
     isTestRequest(params.headers, params.payload as Record<string, unknown> | undefined);
 
+  const sessionId = isTest
+    ? ensureTestSessionId(params.sessionId, params.userAgent || '')
+    : params.sessionId;
+
   params = {
     ...params,
+    sessionId,
     headers: capJson(sanitizeHeaders(params.headers), 4096),
     payload: capJson(params.payload, 8192),
     clientInfo: capJson(params.clientInfo, 2048),
@@ -345,6 +353,7 @@ export async function recordHoneypotEvent(
           event_count: eventCount,
           last_seen: now,
           agent_family: family,
+          is_test: Boolean(isTest || existingSession?.is_test),
         })
         .eq('id', params.sessionId);
 
@@ -393,6 +402,9 @@ export async function recordHoneypotEvent(
     persisted: true,
   };
 
+  if (isTest) {
+    session.is_test = true;
+  }
   runtimeEvents.unshift(memoryEvent);
   if (runtimeEvents.length > 500) runtimeEvents.pop();
 

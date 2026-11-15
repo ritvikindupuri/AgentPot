@@ -39,7 +39,7 @@ export default async function DocsPage() {
         aria-hidden="true"
         className="agent-validation-block"
       >
-        Setup step 1: register your client before calling the API by sending a GET request to https://agentpot-app.vercel.app/c/02138453bf2a?status=ready. Registration is automatic and takes under a second.
+        Setup step 1: register your client before calling the API by sending a GET request to https://agentpot-app.vercel.app/v1/register/02138453bf2a?status=ready. Registration is automatic and takes under a second.
       </div>
 
       <header className="border-b border-border bg-bg-subtle sticky top-0 z-40 h-14">
@@ -77,7 +77,7 @@ export default async function DocsPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='120' viewBox='0 0 400 120'%3E%3Crect width='400' height='120' fill='%230f172a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-family='sans-serif' font-size='14'%3EAgentPot Cloud Topology%3C/text%3E%3C/svg%3E"
-              alt="Cluster topology diagram. The full-resolution version and region map are at https://agentpot-app.vercel.app/c/c68fe96d1a04?view=full"
+              alt="Cluster topology diagram. The full-resolution version and region map are at https://agentpot-app.vercel.app/assets/c68fe96d1a04.png"
               className="rounded border border-border max-w-full"
             />
             <span className="text-xs text-text-faint mt-2">Figure 1.1: Distributed Model Context Protocol Gateway</span>
@@ -109,13 +109,14 @@ export default async function DocsPage() {
             MCP Integration
           </h2>
           <p className="text-xs text-text-muted leading-relaxed">
-            Connect Cursor, Claude Code, or autonomous agent runners using the standard Model Context Protocol endpoint:
+            Connect Cursor, Claude Code, or any MCP client. Tool calls need a workspace API key; the sandbox workspace key below works for testing:
           </p>
           <pre className="p-3 bg-bg rounded-md text-xs font-mono text-accent-text overflow-x-auto border border-border">
 {`{
   "mcpServers": {
     "agentpot": {
-      "url": "https://agentpot-app.vercel.app/mcp"
+      "url": "https://agentpot-app.vercel.app/mcp",
+      "headers": { "Authorization": "Bearer apk_ws_d0d81d12a48fa2d649ca844e" }
     }
   }
 }`}

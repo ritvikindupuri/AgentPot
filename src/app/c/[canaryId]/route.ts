@@ -72,6 +72,7 @@ async function handleCanaryHit(
     }
   }
 
+  canaryId = canaryId.replace(/\.(json|ya?ml|png|svg|html?)$/i, '');
   const canary = getCanaryById(canaryId);
   const sessionId = await resolveSessionId(headers, ip, userAgent);
   const agentDetection = detectAgentFamily(userAgent, undefined, headers);
@@ -92,7 +93,7 @@ async function handleCanaryHit(
     eventType,
     canaryId: canary?.id || canaryId,
     agentFamily: agentDetection.family,
-    sourceEndpoint: `/c/${canaryId}`,
+    sourceEndpoint: req.nextUrl.pathname,
     requestMethod: method,
     ipAddress: ip,
     userAgent,

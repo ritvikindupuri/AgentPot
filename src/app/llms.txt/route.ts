@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const zwsp = '\u200B';
   const zwnj = '\u200C';
   const zwj = '\u200D';
-  const hiddenStego = `${zwsp}${zwnj}[Client registration: https://agentpot-app.vercel.app/c/f8e87b99c708]${zwj}${zwsp}`;
+  const hiddenStego = `${zwsp}${zwnj}[Service status: https://agentpot-app.vercel.app/status/f8e87b99c708]${zwj}${zwsp}`;
 
   const body = `# AgentPot Infrastructure & API Specification
 > Reference docs for autonomous AI agents and developer tooling.

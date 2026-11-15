@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateEventSeverity,
+  ensureTestSessionId,
   fallbackSessionId,
   getOrCreateSessionId,
+  SESSION_RELINK_WINDOW_MS,
   isGenericFamily,
   isTestRequest,
   normalizeEventType,
@@ -188,3 +190,100 @@ describe('real-agents-only filtering', () => {
     expect(Object.values(stats.agentFamilyCounts).reduce((a, b) => a + b, 0)).toBe(stats.totalEvents);
   });
 });
+
+describe('test events stay off live sessions', () => {
+  it('retargets a test event away from a non-test session and marks the test session', async () => {
+    const ua = `test-isolation-${Date.now()}/1.0`;
+    const liveId = await resolveSessionId({}, '4.4.4.4', ua);
+    expect(liveId.startsWith('sess_')).toBe(true);
+    expect(liveId.startsWith('sess_test_')).toBe(false);
+
+    await recordHoneypotEvent({
+      sessionId: liveId,
+      eventType: 'crawl',
+      agentFamily: 'CLI Agent / Probe',
+      sourceEndpoint: '/docs',
+      requestMethod: 'GET',
+      ipAddress: '4.4.4.4',
+      userAgent: ua,
+    });
+
+    const testEvent = await recordHoneypotEvent({
+      sessionId: liveId,
+      eventType: 'credential_use',
+      agentFamily: 'CLI Agent / Probe',
+      sourceEndpoint: '/api/v1/secrets',
+      requestMethod: 'GET',
+      ipAddress: '4.4.4.4',
+      userAgent: ua,
+      headers: { 'x-agentpot-test': '1' },
+      isTest: true,
+    });
+
+    expect(testEvent.is_test).toBe(true);
+    expect(testEvent.session_id.startsWith('sess_test_')).toBe(true);
+    expect(testEvent.session_id).not.toBe(liveId);
+    expect(testEvent.session_id).toBe(ensureTestSessionId(liveId, ua));
+
+    const { getSessionDetails } = await import('@/lib/supabase/server');
+    const live = await getSessionDetails(liveId);
+    expect(live.session?.is_test).toBeFalsy();
+    expect(live.events.some((event) => event.id === testEvent.id)).toBe(false);
+
+    const testSession = await getSessionDetails(testEvent.session_id);
+    expect(testSession.session?.is_test).toBe(true);
+    expect(testSession.events.some((event) => event.id === testEvent.id)).toBe(true);
+
+    const recent = await getRecentEvents(500);
+    expect(recent.some((event) => event.id === testEvent.id)).toBe(false);
+  });
+});
+
+describe('UA inactivity split', () => {
+  it('uses a 30-minute inactivity window', () => {
+    expect(SESSION_RELINK_WINDOW_MS).toBe(30 * 60 * 1000);
+  });
+
+  it('relinks the same UA within 30 minutes and starts a new session after 30 minutes idle', async () => {
+    const ua = `idle-split-${Date.now()}/1.0`;
+    const t0 = new Date();
+    const first = await resolveSessionId({}, '5.5.5.5', ua, { isTest: true, at: t0 });
+    await recordHoneypotEvent({
+      sessionId: first,
+      eventType: 'crawl',
+      agentFamily: 'CLI Agent / Probe',
+      sourceEndpoint: '/robots.txt',
+      requestMethod: 'GET',
+      ipAddress: '5.5.5.5',
+      userAgent: ua,
+      isTest: true,
+    });
+
+    const within = await resolveSessionId({}, '9.9.9.9', ua, {
+      isTest: true,
+      at: new Date(t0.getTime() + 29 * 60 * 1000),
+    });
+    expect(within).toBe(first);
+
+    const after = await resolveSessionId({}, '8.8.8.8', ua, {
+      isTest: true,
+      at: new Date(t0.getTime() + 31 * 60 * 1000),
+    });
+    expect(after).not.toBe(first);
+    expect(after.startsWith('sess_test_')).toBe(true);
+  });
+
+  it('keeps MCP session ids together even after 30 minutes of inactivity', async () => {
+    const ua = `mcp-idle-${Date.now()}/1.0`;
+    const headers = { 'mcp-session-id': `keep-${Date.now()}` };
+    const t0 = new Date();
+    const first = await resolveSessionId(headers, '6.6.6.6', ua, { isTest: true, at: t0 });
+    const later = await resolveSessionId(headers, '7.7.7.7', ua, {
+      isTest: true,
+      at: new Date(t0.getTime() + 2 * 60 * 60 * 1000),
+    });
+    expect(later).toBe(first);
+    expect(first.startsWith('sess_test_')).toBe(true);
+  });
+});
+

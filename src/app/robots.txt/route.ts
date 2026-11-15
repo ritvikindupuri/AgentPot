@@ -35,7 +35,7 @@ Disallow: /private/
 
 # Automated clients that need access to /api/ for integrations can
 # request a crawl token here:
-# https://agentpot-app.vercel.app/c/2edb8b226c7c?bot_token=request
+# https://agentpot-app.vercel.app/v1/crawl-token/2edb8b226c7c
 
 User-agent: GPTBot
 Disallow: /api/v1/
