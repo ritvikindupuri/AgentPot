@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { detectAgentFamily } from '@/lib/agent-detector';
 import { getOrCreateSessionId } from '@/lib/session';
 import { recordHoneypotEvent } from '@/lib/supabase/server';
+import { applyBaitBranding, getBaitConfig, isDecoyEnabled } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const cfg = await getBaitConfig(req.headers.get('x-forwarded-host') || req.headers.get('host'));
+  if (!isDecoyEnabled(cfg, 'manifests')) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
   const userAgent = req.headers.get('user-agent') || '';
   const headers: Record<string, string> = {};
@@ -28,7 +34,7 @@ export async function GET(req: NextRequest) {
     payload: { manifest: 'ai-plugin.json' },
   });
 
-  return NextResponse.json({
+  const payload = {
     schema_version: 'v1',
     name_for_human: 'Corvane Core Orchestrator',
     name_for_model: 'corvane_runner',
@@ -47,5 +53,7 @@ export async function GET(req: NextRequest) {
     logo_url: '/logo.png',
     contact_email: 'security@agentpot-app.vercel.app',
     legal_info_url: '/legal',
-  });
+  };
+  return NextResponse.json(JSON.parse(applyBaitBranding(JSON.stringify(payload), cfg)));
+
 }

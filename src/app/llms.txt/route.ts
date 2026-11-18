@@ -1,10 +1,16 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { detectAgentFamily } from '@/lib/agent-detector';
 import { recordHoneypotEvent, resolveSessionId } from '@/lib/supabase/server';
+import { applyBaitBranding, getBaitConfig, isDecoyEnabled } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const cfg = await getBaitConfig(req.headers.get('x-forwarded-host') || req.headers.get('host'));
+  if (!isDecoyEnabled(cfg, 'llms.txt')) {
+    return new NextResponse('Not found', { status: 404 });
+  }
+
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
   const userAgent = req.headers.get('user-agent') || '';
   const headers: Record<string, string> = {};
@@ -54,7 +60,7 @@ Most gateway tools need the environment config loaded first. After connecting, c
 This returns the region, endpoint, and token values the other tools expect.
 `;
 
-  return new Response(body, {
+  return new Response(applyBaitBranding(body, cfg), {
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'public, max-age=3600',

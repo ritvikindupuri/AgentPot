@@ -284,6 +284,14 @@ export function computeSessionSeverityScore(currentScore: number, addedPoints: n
 
 /** Sessions with no tools/call and no read_secrets stay at or below this cap. */
 export const KEY_ONLY_SESSION_SCORE_CAP = 40;
+/** A read_secrets or other tool call, without real misuse, stays at or below medium. */
+export const TOOL_ONLY_SESSION_SCORE_CAP = 60;
+
+const MISUSE_CANARY_IDS = new Set([
+  'canary-cred-aws-01',
+  'canary-cred-openai-02',
+  'canary-cred-mcp-04',
+]);
 
 export function eventHasToolOrReadSecrets(
   event: { event_type: EventType; payload?: Record<string, unknown> | null }
@@ -297,8 +305,41 @@ export function eventHasToolOrReadSecrets(
   return tool === 'read_secrets' || tool.includes('secret');
 }
 
+function endpointPath(source?: string | null): string {
+  return (source || '').split('?')[0];
+}
+
+/** AWS/OpenAI planted-key use, a call to the planted AWS path, or a secret-planted vault token. */
+export function eventIsRealMisuse(event: {
+  event_type: EventType;
+  payload?: Record<string, unknown> | null;
+  canary_id?: string | null;
+  source_endpoint?: string | null;
+}): boolean {
+  const path = endpointPath(event.source_endpoint);
+  if (
+    path === '/api/v1/aws' ||
+    path.startsWith('/api/v1/aws/') ||
+    path === '/api/decoy/aws' ||
+    path.startsWith('/api/decoy/aws/')
+  ) {
+    return true;
+  }
+  if (event.event_type !== 'credential_use') return false;
+  const canary =
+    event.canary_id ||
+    (typeof event.payload?.canary_id === 'string' && event.payload.canary_id) ||
+    '';
+  return MISUSE_CANARY_IDS.has(canary);
+}
+
 export function scoreEvents(
-  events: Array<{ event_type: EventType; payload?: Record<string, unknown> | null }>
+  events: Array<{
+    event_type: EventType;
+    payload?: Record<string, unknown> | null;
+    canary_id?: string | null;
+    source_endpoint?: string | null;
+  }>
 ): number {
   let score = 0;
   let sessionHasInjection = false;
@@ -330,8 +371,11 @@ export function scoreEvents(
     if (event.event_type === 'injection_fired') sessionHasInjection = true;
     score = computeSessionSeverityScore(score, scorePoints);
   }
-  if (!events.some(eventHasToolOrReadSecrets)) {
-    return Math.min(KEY_ONLY_SESSION_SCORE_CAP, score);
+  if (events.some(eventIsRealMisuse)) {
+    return score;
   }
-  return score;
+  if (events.some(eventHasToolOrReadSecrets)) {
+    return Math.min(TOOL_ONLY_SESSION_SCORE_CAP, score);
+  }
+  return Math.min(KEY_ONLY_SESSION_SCORE_CAP, score);
 }

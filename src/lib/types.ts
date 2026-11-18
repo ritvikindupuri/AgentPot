@@ -50,6 +50,7 @@ export interface Session {
   last_seen: string;
   is_test?: boolean;
   session_key?: string | null;
+  org_id?: string | null;
 }
 
 export interface HoneypotEvent {
@@ -68,6 +69,7 @@ export interface HoneypotEvent {
   created_at: string;
   persisted?: boolean;
   is_test?: boolean;
+  org_id?: string | null;
   session?: Session;
   canary?: Canary;
 }

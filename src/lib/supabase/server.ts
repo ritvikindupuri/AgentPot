@@ -16,6 +16,7 @@ import {
   withSessionLock,
 } from '../session';
 import { sanitizeHeaders } from '../headers';
+import { DEFAULT_ORG_ID } from '../settings';
 import { CANARY_LIBRARY, PLANTED_CREDENTIALS } from '../canaries';
 import {
   EventLite,
@@ -416,6 +417,7 @@ export async function recordHoneypotEvent(
     severity,
     created_at: now,
     is_test: isTest,
+    org_id: DEFAULT_ORG_ID,
   };
 
   const persistSessionCounts = async (allEvents: HoneypotEvent[]) => {
@@ -442,6 +444,7 @@ export async function recordHoneypotEvent(
           first_seen: now,
           last_seen: now,
           is_test: isTest,
+          org_id: DEFAULT_ORG_ID,
         });
 
         if (sessionInsertError) {

@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutGrid, Activity, Users, Flag, LogOut, X } from 'lucide-react';
+import { LayoutGrid, Activity, Users, Flag, Settings, LogOut, X } from 'lucide-react';
 import { Logo } from '../ui/Logo';
 
 interface SidebarProps {
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/events', label: 'Events', icon: Activity, exact: false },
   { href: '/dashboard/sessions', label: 'Sessions', icon: Users, exact: false },
   { href: '/dashboard/canaries', label: 'Canaries', icon: Flag, exact: false },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings, exact: false },
 ];
 
 export function Sidebar({ mobileOpen, onCloseMobile, userEmail }: SidebarProps) {

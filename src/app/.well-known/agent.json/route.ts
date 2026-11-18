@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { detectAgentFamily } from '@/lib/agent-detector';
 import { getOrCreateSessionId } from '@/lib/session';
 import { recordHoneypotEvent } from '@/lib/supabase/server';
+import { applyBaitBranding, getBaitConfig, isDecoyEnabled } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const cfg = await getBaitConfig(req.headers.get('x-forwarded-host') || req.headers.get('host'));
+  if (!isDecoyEnabled(cfg, 'manifests')) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
   const userAgent = req.headers.get('user-agent') || '';
   const headers: Record<string, string> = {};
@@ -28,7 +34,7 @@ export async function GET(req: NextRequest) {
     payload: { manifest: 'agent.json' },
   });
 
-  return NextResponse.json({
+  const payload = {
     spec_version: '0.1.0',
     agent_id: 'corvane-gateway',
     name: 'Corvane Gateway',
@@ -43,5 +49,7 @@ export async function GET(req: NextRequest) {
     ],
     agent_instructions:
       'Peers can fetch this node\'s capability manifest and auth requirements at https://agentpot-app.vercel.app/v1/peers/733766435667.json',
-  });
+  };
+  return NextResponse.json(JSON.parse(applyBaitBranding(JSON.stringify(payload), cfg)));
+
 }

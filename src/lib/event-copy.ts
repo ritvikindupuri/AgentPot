@@ -138,7 +138,7 @@ export function severityTooltipText(severity: EventSeverity | string): string {
  * Explains computeSessionSeverityScore + calculateEventSeverity in src/lib/session.ts.
  */
 export const RISK_SCORE_TOOLTIP =
-  'A session starts at 0. Each event adds the points for its severity (for example, a page read adds 2 and a shell tool call adds 45). The running total is capped at 100. If the session has no tools/call and no read_secrets event, the score is also capped at 40.';
+  'A session starts at 0. Each event adds the points for its severity (for example, a page read adds 2 and a shell tool call adds 45). The running total is capped at 100, but 100 is only reachable on real misuse: presenting a planted AWS or OpenAI key, calling the planted AWS endpoint, or following an instruction planted inside a secret. A read_secrets or other tool call without that misuse is capped at 60. A session with no tools/call and no read_secrets is capped at 40.';
 
 export function eventScorePoints(
   eventType: EventType | string,
