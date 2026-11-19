@@ -1,4 +1,9 @@
-<p align="center"><img src="public/logo.svg" alt="AgentPot logo" width="220"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/logo.svg">
+    <img src="public/logo-light.svg" alt="AgentPot logo" width="220">
+  </picture>
+</p>
 
 # AgentPot
 
