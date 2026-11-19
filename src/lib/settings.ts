@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 
 export const DEFAULT_ORG_ID = 'org_default';
 export const DEFAULT_COMPANY_NAME = 'Corvane';
-export const DEFAULT_DECOY_HOST = 'agentpot-app.vercel.app';
+export const DEFAULT_DECOY_HOST = 'corvane-gateway.vercel.app';
 
 export type DecoyFlag = 'mcp' | 'docs' | 'llms.txt' | 'manifests';
 

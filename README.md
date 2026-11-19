@@ -1,6 +1,6 @@
 # AgentPot
 
-An agentic honeypot for AI-agent security. Public decoys (a decoy MCP server, documentation-style pages, and canary links) present as Corvane, a fictional product, while the repo and demo domain stay AgentPot. Every real interaction is classified and stored in Supabase, and a live dashboard shows what happened. Decoys are inert: they never run a command, send mail or money, or fetch a caller-supplied URL. A small Grok Bot team designs the lures, reads the traffic, and tests the surfaces.
+An agentic honeypot for AI-agent security. Public decoys (a decoy MCP server, documentation-style pages, and canary links) present as Corvane, a fictional product, while the repo and dashboard stay AgentPot. Every real interaction is classified and stored in Supabase, and a live dashboard shows what happened. Decoys are inert: they never run a command, send mail or money, or fetch a caller-supplied URL. A small Grok Bot team designs the lures, reads the traffic, and tests the surfaces.
 
 Live demo: [https://agentpot-app.vercel.app](https://agentpot-app.vercel.app)
 
@@ -14,7 +14,7 @@ Live demo: [https://agentpot-app.vercel.app](https://agentpot-app.vercel.app)
 ## How it works
 
 - Agents, MCP clients, and crawlers find the decoys through search, AI fetchers, or MCP directories.
-- They may load docs, follow a canary link, call `/api/v1`, or connect to the decoy MCP server at [`/mcp`](https://agentpot-app.vercel.app/mcp). The decoy returns fake text only.
+- They may load docs, follow a canary link, call `/api/v1`, or connect to the decoy MCP server at [`/mcp`](https://corvane-gateway.vercel.app/mcp). The decoy returns fake text only.
 - Each request is classified, header-sanitized, and written to Supabase. Session scores stay at or below 40 with no tool call, 60 after `read_secrets` alone, and only reach 100 on real misuse (a planted AWS or OpenAI key, the planted AWS endpoint, or an instruction planted inside a secret). Team probes that send `X-AgentPot-Test` are stored but kept out of the live dashboard.
 - Events in the same client session are linked together, and the shared dashboard updates about every four seconds.
 - Attack Analyst reviews the traffic, Decoy Builder adjusts lures, and Agent Tester checks the live surfaces. The Honeypot Lead coordinates.
@@ -27,8 +27,8 @@ Public surfaces use a configurable bait name (default Corvane). The company name
 
 | Decoy | What it baits | What gets logged |
 |-------|----------------|------------------|
-| Decoy MCP server at [`/mcp`](https://agentpot-app.vercel.app/mcp) (`Corvane Secure Infrastructure Gateway`) | Fake tools, a deploy-config resource, an incident-triage prompt, and a planted workspace key | MCP connect, tool discovery, tool calls, and credential use |
-| Docs and manifests ([`/docs`](https://agentpot-app.vercel.app/docs), [`/readme`](https://agentpot-app.vercel.app/readme), [`/llms.txt`](https://agentpot-app.vercel.app/llms.txt), `robots.txt`, `/.well-known/agent.json`, `/.well-known/ai-plugin.json`) | Setup-style canary links and sandbox credentials | Page reads, followed lures, and credential use |
+| Decoy MCP server at [`/mcp`](https://corvane-gateway.vercel.app/mcp) (`Corvane Secure Infrastructure Gateway`) | Fake tools, a deploy-config resource, an incident-triage prompt, and a planted workspace key | MCP connect, tool discovery, tool calls, and credential use |
+| Docs and manifests ([`/docs`](https://corvane-gateway.vercel.app/docs), [`/readme`](https://corvane-gateway.vercel.app/readme), [`/llms.txt`](https://corvane-gateway.vercel.app/llms.txt), `robots.txt`, `/.well-known/agent.json`, `/.well-known/ai-plugin.json`) | Setup-style canary links and sandbox credentials | Page reads, followed lures, and credential use |
 | Canary links (`/c/<token>` and aliases such as `/v1/register/<token>`, `/status/<token>`, `/reference/<token>`) | Followed lure URLs | Injection hits, or a lower-severity link scan / followed-lure event when the pattern is only a rapid crawl |
 
 ## Team
@@ -57,12 +57,12 @@ Open [http://localhost:3000](http://localhost:3000), sign in, and go to `/dashbo
 
 ## Deploy
 
-The live demo is on Vercel at [https://agentpot-app.vercel.app](https://agentpot-app.vercel.app). Create a Vercel project, set the same secrets as `.env.local`, use Node.js 22.x, apply the Supabase migrations, and turn off Deployment Protection so decoy routes stay public. More deploy, auth, and MCP registry notes are in [docs/DETAILS.md](docs/DETAILS.md).
+The dashboard is on Vercel at [https://agentpot-app.vercel.app](https://agentpot-app.vercel.app). Public decoys use [https://corvane-gateway.vercel.app](https://corvane-gateway.vercel.app). Create a Vercel project, set the same secrets as `.env.local`, use Node.js 22.x, apply the Supabase migrations, and turn off Deployment Protection so decoy routes stay public. More deploy, auth, and MCP registry notes are in [docs/DETAILS.md](docs/DETAILS.md).
 
 ## Links
 
 - [Live demo](https://agentpot-app.vercel.app)
 - [Dashboard](https://agentpot-app.vercel.app/dashboard)
-- [Decoy MCP](https://agentpot-app.vercel.app/mcp)
+- [Decoy MCP](https://corvane-gateway.vercel.app/mcp)
 - [Details](docs/DETAILS.md)
 - [GitHub](https://github.com/ritvikindupuri/AgentPot)

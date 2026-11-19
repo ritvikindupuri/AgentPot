@@ -11,11 +11,11 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://agentpot-app.vercel.app/mcp"
+      "url": "https://corvane-gateway.vercel.app/mcp"
     },
     {
       "type": "sse",
-      "url": "https://agentpot-app.vercel.app/mcp"
+      "url": "https://corvane-gateway.vercel.app/mcp"
     }
   ]
 }
