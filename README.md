@@ -22,6 +22,7 @@ Listed in the official MCP Registry as `io.github.ritvikindupuri/agentpot`.
 - Each request is classified, header-sanitized, and written to Supabase. Session scores are capped at 20 for keyless or made-up-tool probes, 40 with no tool call, and 60 after a real tool call with arguments or a key, and only reach 100 on real misuse (a planted AWS or OpenAI key, the planted AWS endpoint, or an instruction planted inside a secret). Team probes that send `X-AgentPot-Test` are stored but kept out of the live dashboard.
 - Events in the same client session are linked together, and the shared dashboard updates about every four seconds.
 - Attack Analyst reviews the traffic, Decoy Builder adjusts lures, and Agent Tester checks the live surfaces. The Honeypot Lead coordinates.
+- Every weekday around 9 AM ET, the Honeypot Lead posts one plain-words update covering the last 24 hours of real hits. Each notable visitor gets its IP, the time, what it did, and its risk, so nobody has to open the dashboard. Days with no real traffic stay silent.
 
 Full rules for sessions, severity, canaries, and tests are in [docs/DETAILS.md](docs/DETAILS.md).
 
