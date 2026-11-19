@@ -1,8 +1,12 @@
+<p align="center"><img src="public/logo.svg" alt="AgentPot logo" width="220"></p>
+
 # AgentPot
 
 An agentic honeypot for AI-agent security. Public decoys (a decoy MCP server, documentation-style pages, and canary links) present as Corvane, a fictional product, while the repo and dashboard stay AgentPot. Every real interaction is classified and stored in Supabase, and a live dashboard shows what happened. Decoys are inert: they never run a command, send mail or money, or fetch a caller-supplied URL. A small Grok Bot team designs the lures, reads the traffic, and tests the surfaces.
 
 Live demo: [https://agentpot-app.vercel.app](https://agentpot-app.vercel.app)
+
+Listed in the official MCP Registry as `io.github.ritvikindupuri/agentpot`.
 
 ## Architecture
 
