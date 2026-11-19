@@ -19,7 +19,7 @@ Listed in the official MCP Registry as `io.github.ritvikindupuri/agentpot`.
 
 - Agents, MCP clients, and crawlers find the decoys through search, AI fetchers, or MCP directories.
 - They may load docs, follow a canary link, call `/api/v1`, or connect to the decoy MCP server at [`/mcp`](https://corvane-gateway.vercel.app/mcp). The decoy returns fake text only.
-- Each request is classified, header-sanitized, and written to Supabase. Session scores stay at or below 40 with no tool call, 60 after `read_secrets` alone, and only reach 100 on real misuse (a planted AWS or OpenAI key, the planted AWS endpoint, or an instruction planted inside a secret). Team probes that send `X-AgentPot-Test` are stored but kept out of the live dashboard.
+- Each request is classified, header-sanitized, and written to Supabase. Session scores stay at or below 40 with no tool call, 20 for keyless or unknown-tool probes, 60 after a real tool call or `read_secrets`, and only reach 100 on real misuse (a planted AWS or OpenAI key, the planted AWS endpoint, or an instruction planted inside a secret). Team probes that send `X-AgentPot-Test` are stored but kept out of the live dashboard.
 - Events in the same client session are linked together, and the shared dashboard updates about every four seconds.
 - Attack Analyst reviews the traffic, Decoy Builder adjusts lures, and Agent Tester checks the live surfaces. The Honeypot Lead coordinates.
 
