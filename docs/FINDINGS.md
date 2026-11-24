@@ -102,7 +102,7 @@ Other confirmed patterns, not repeated in the table:
 
 ## Sample daily update
 
-Every weekday around 9 AM ET, the Honeypot Lead posts one plain-words update covering the last 24 hours of real hits. Days with no real traffic stay silent. The example below is the Nov 24 window (Nov 23, 8:57 AM ET to Nov 24, 8:57 AM ET), using visitors confirmed in the queries for this report.
+Every day around 9 AM ET, the Honeypot Lead posts one plain-words update covering the last 24 hours of real hits. Days with no real traffic stay silent. The example below is the Nov 24 window (Nov 23, 8:57 AM ET to Nov 24, 8:57 AM ET), using visitors confirmed in the queries for this report.
 
 From Nov 23, 8:57 AM ET to Nov 24, 8:57 AM ET, nobody was hijacked.
 
