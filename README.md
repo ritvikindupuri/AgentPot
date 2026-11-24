@@ -31,6 +31,10 @@ Listed in the official MCP Registry as `io.github.ritvikindupuri/agentpot`.
 
 Full rules for sessions, severity, canaries, and tests are in [docs/DETAILS.md](docs/DETAILS.md).
 
+## Findings
+
+Real traffic since launch is summarized in [docs/FINDINGS.md](docs/FINDINGS.md), including notable visitors, which decoys were touched, and a sample weekday update. From Nov 14, 2026, 11:27 PM ET through Nov 24, 2026, 9:20 AM ET, the decoys recorded 1,451 real sessions from 524 IPs. Nobody was hijacked. Team probes and operator IPs are excluded. IPs of public crawlers are shown as observed.
+
 ## Decoys
 
 Public surfaces use a configurable bait name (default Corvane). The company name, decoy hostname, and which decoys are enabled are edited from the dashboard Settings page. Planted secret values are not listed here.
@@ -75,4 +79,5 @@ The dashboard is on Vercel at [https://agentpot-app.vercel.app](https://agentpot
 - [Dashboard](https://agentpot-app.vercel.app/dashboard)
 - [Decoy MCP](https://corvane-gateway.vercel.app/mcp)
 - [Details](docs/DETAILS.md)
+- [Findings](docs/FINDINGS.md)
 - [GitHub](https://github.com/ritvikindupuri/AgentPot)
