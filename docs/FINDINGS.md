@@ -2,6 +2,8 @@
 
 Observed traffic from the live decoys, not a simulation. All times are ET (America/Indianapolis). IPs of public crawlers are shown as observed. Planted secret values are not listed here.
 
+![AgentPot live dashboard overview, Nov 24, 2026](images/dashboard.png)
+
 ## Summary
 
 From Nov 14, 2026, 11:27 PM ET through Nov 24, 2026, 9:20 AM ET, AgentPot recorded 1,451 real sessions from 524 IPs, and nobody was hijacked.
